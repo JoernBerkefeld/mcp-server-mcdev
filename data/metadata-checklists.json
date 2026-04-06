@@ -1,0 +1,69 @@
+{
+  "journey": {
+    "label": "Journey (Interaction)",
+    "description": "Common dependencies and decisions when authoring or retrieving journeys with mcdev. Refine by activity types in your design.",
+    "questions": [
+      {
+        "id": "journey_type",
+        "prompt": "What journey shape are you targeting (e.g. multi-step, single send / quick send, API-triggered)? This drives which activities and event assets apply."
+      },
+      {
+        "id": "folder",
+        "prompt": "Which journey folder (category) should hold the definition? mcdev maps folder-journey; ensure the folder exists or retrieve it first."
+      },
+      {
+        "id": "email_activity",
+        "prompt": "For email activities: which sender profile, send classification, and transactional or classic email/asset-message assets are required? List their keys or retrieve them from the BU."
+      },
+      {
+        "id": "data_extension",
+        "prompt": "Which Data Extensions feed entry events, update contact, or exclusions? Confirm keys and that they are deployed before the journey."
+      },
+      {
+        "id": "event",
+        "prompt": "For multi-step or API entry: which event definition is used? Retrieve `event` metadata and align keys with the journey entry configuration."
+      },
+      {
+        "id": "sms_push",
+        "prompt": "If SMS or push activities are included: which mobileKeyword, mobileCode, mobileMessage, or mobileApplication assets apply?"
+      }
+    ],
+    "dependentMetadataTypes": [
+      "folder-journey",
+      "triggeredSend",
+      "dataExtension",
+      "deliveryProfile",
+      "event",
+      "mobileMessage",
+      "mobileCode",
+      "mobileKeyword",
+      "asset-mobile",
+      "list",
+      "email",
+      "asset-message",
+      "sendClassification",
+      "senderProfile",
+      "mobileApplication"
+    ],
+    "notes": [
+      "Retrieve or deploy dependencies in an order that respects your BU: folders and shared assets before the journey JSON.",
+      "Use `mcdev explainTypes` and the wiki page on metadata-specific settings for journey edge cases."
+    ]
+  },
+  "automation": {
+    "label": "Automation",
+    "description": "Automation Studio workflow dependencies.",
+    "questions": [
+      {
+        "id": "steps",
+        "prompt": "Which step types are used (SQL, script, journey entry, send email, etc.)? Each implies different linked metadata."
+      },
+      {
+        "id": "schedule",
+        "prompt": "What schedule or trigger should mcdev document on retrieve (cron vs manual)?"
+      }
+    ],
+    "dependentMetadataTypes": ["automation", "folder-automation", "query", "script", "dataExtension"],
+    "notes": ["Validate automation JSON after templating if you use markets with suffixes."]
+  }
+}

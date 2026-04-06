@@ -1,0 +1,62 @@
+{
+    "name": "mcp-server-mcdev",
+    "version": "0.1.0",
+    "mcpName": "io.github.JoernBerkefeld/mcp-server-mcdev",
+    "description": "MCP server for mcdev: SFMC DevTools wiki search, config help, metadata checklists, mcdev types.",
+    "author": "Jörn Berkefeld",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/JoernBerkefeld/mcp-server-mcdev.git"
+    },
+    "bugs": {
+        "url": "https://github.com/JoernBerkefeld/mcp-server-mcdev/issues"
+    },
+    "homepage": "https://github.com/JoernBerkefeld/mcp-server-mcdev#readme",
+    "keywords": [
+        "mcp",
+        "model-context-protocol",
+        "mcdev",
+        "sfmc",
+        "salesforce",
+        "marketing-cloud",
+        "devtools"
+    ],
+    "type": "module",
+    "bin": {
+        "mcp-server-mcdev": "./dist/index.js"
+    },
+    "main": "./dist/index.js",
+    "exports": {
+        ".": "./dist/index.js"
+    },
+    "files": [
+        "dist",
+        "bundled",
+        "data",
+        "README.md",
+        "LICENSE",
+        "server.json"
+    ],
+    "scripts": {
+        "prepublishOnly": "npm run build",
+        "bundle-wiki": "node scripts/bundle-wiki.mjs",
+        "build": "npm run bundle-wiki && tsc -p tsconfig.json",
+        "dev": "tsc -p tsconfig.json --watch",
+        "start": "node dist/index.js",
+        "test": "node --test tests/*.test.mjs",
+        "clean": "node -e \"import fs from 'fs'; fs.rmSync('dist', { recursive: true, force: true });\""
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "mcdev": "^9.0.3",
+        "zod": "^3.24.0"
+    },
+    "engines": {
+        "node": ">=20"
+    },
+    "devDependencies": {
+        "@types/node": "^22.19.17",
+        "typescript": "^5.9.0"
+    }
+}

@@ -1,0 +1,8 @@
+node_modules
+tests
+coverage
+.github
+*.test.mjs
+tsconfig*.json
+*.tsbuildinfo
+scripts
