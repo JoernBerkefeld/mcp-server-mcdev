@@ -6,12 +6,12 @@
     "url": "https://github.com/JoernBerkefeld/mcp-server-mcdev",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "mcp-server-mcdev",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": {
         "type": "stdio"
       }
