@@ -24,7 +24,11 @@ CI publishes npm artifacts and registry metadata using **GitHub OIDC** ([Actions
 | `mcdev_list_metadata_types` | Types from `Mcdev.explainTypes()` (silent JSON mode — safe for MCP stdio) |
 | `read_mcdev_project_config` | Read `.mcdevrc.json` with `credentials` stripped (never reads `.mcdev-auth.json`) |
 
-## Cursor / VS Code `mcp.json`
+## Connecting AI clients
+
+Register **`mcp-server-mcdev`** with the same patterns as other stdio MCP servers (package name in `args`).
+
+### VS Code (1.99+) — `.vscode/mcp.json`
 
 ```json
 {
@@ -37,6 +41,35 @@ CI publishes npm artifacts and registry metadata using **GitHub OIDC** ([Actions
   }
 }
 ```
+
+### Cursor — `~/.cursor/mcp.json` or project `.cursor/mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "mcdev": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-mcdev@latest"]
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) — use the same `mcpServers` object shape as Cursor.
+
+### Windsurf
+
+`~/.codeium/windsurf/mcp_config.json` — same `mcpServers` shape as Cursor.
+
+### Global install (faster startup)
+
+```bash
+npm install -g mcp-server-mcdev
+```
+
+Then use `"command": "mcp-server-mcdev", "args": []` (or the binary name from this package’s `bin` field).
 
 ## SFMC DevTools VS Code extension
 
