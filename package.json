@@ -1,6 +1,6 @@
 {
     "name": "mcp-server-mcdev",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "mcpName": "io.github.JoernBerkefeld/mcp-server-mcdev",
     "description": "MCP server for mcdev: SFMC DevTools wiki search, config help, metadata checklists, mcdev types.",
     "author": "Jörn Berkefeld",
