@@ -38,13 +38,13 @@ for (const dir of candidates) {
 if (!ok) {
     fs.mkdirSync(outDir, { recursive: true });
     const stub = path.join(outDir, 'README.md');
-    if (!fs.existsSync(stub)) {
+    if (fs.existsSync(stub)) {
+        process.stderr.write('bundle-wiki: no wiki source found; keeping existing bundled/wiki\n');
+    } else {
         fs.writeFileSync(
             stub,
-            '# Wiki bundle placeholder\n\nRun `npm run bundle-wiki` with `../sfmc-devtools.wiki` present, or set `SFMC_DEVTOOLS_WIKI`.\n',
+            '# Wiki bundle placeholder\n\nRun `npm run bundle-wiki` with `../sfmc-devtools.wiki` present, or set `SFMC_DEVTOOLS_WIKI`.\n'
         );
         process.stderr.write('bundle-wiki: no wiki source found; wrote stub README.md\n');
-    } else {
-        process.stderr.write('bundle-wiki: no wiki source found; keeping existing bundled/wiki\n');
     }
 }

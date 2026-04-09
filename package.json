@@ -3,7 +3,7 @@
     "version": "0.1.1",
     "mcpName": "io.github.JoernBerkefeld/mcp-server-mcdev",
     "description": "MCP server for mcdev: SFMC DevTools wiki search, config help, metadata checklists, mcdev types.",
-    "author": "Jörn Berkefeld",
+    "author": "JÃ¶rn Berkefeld",
     "license": "MIT",
     "repository": {
         "type": "git",
@@ -45,7 +45,11 @@
         "dev": "tsc -p tsconfig.json --watch",
         "start": "node dist/index.js",
         "test": "node --test tests/*.test.mjs",
-        "clean": "node -e \"import fs from 'fs'; fs.rmSync('dist', { recursive: true, force: true });\""
+        "clean": "node -e \"import fs from 'fs'; fs.rmSync('dist', { recursive: true, force: true });\"",
+        "lint": "eslint .",
+        "lint:fix": "eslint --fix .",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
@@ -56,7 +60,16 @@
         "node": ">=20"
     },
     "devDependencies": {
+        "@eslint/js": "^10.0.1",
         "@types/node": "^22.19.17",
-        "typescript": "^5.9.0"
+        "eslint": "^10.1.0",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-jsdoc": "^62.0.0",
+        "eslint-plugin-prettier": "^5.5.0",
+        "eslint-plugin-unicorn": "^64.0.0",
+        "globals": "^17.4.0",
+        "prettier": "^3.8.1",
+        "typescript": "^5.9.0",
+        "typescript-eslint": "^8.57.2"
     }
 }
