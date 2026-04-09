@@ -18,21 +18,30 @@ export const CONFIG_TOPICS: Record<
         summary:
             'Named lists that map credential/BU paths to market keys for deployment flows. ' +
             'Often used with `mcdev build --bulk`, parent/child BU patterns, and createDeltaPkg when promoting across stages.',
-        relatedWikiFiles: ['07.-Advanced-Configuration.md', '06.d-~-Git-based-deployments-and-CICD.md'],
+        relatedWikiFiles: [
+            '07.-Advanced-Configuration.md',
+            '06.d-~-Git-based-deployments-and-CICD.md',
+        ],
     },
     createDeltaPkg: {
         title: 'createDeltaPkg (cdp)',
         summary:
             'Git-driven packaging: diff a commit range, optionally filter paths, run templating/build steps for changed metadata, ' +
             'and prepare deployable output. Controlled by `metaDataTypes.createDeltaPkg`, deployment branch mappings, and filters.',
-        relatedWikiFiles: ['06.d-~-Git-based-deployments-and-CICD.md', '07.-Advanced-Configuration.md'],
+        relatedWikiFiles: [
+            '06.d-~-Git-based-deployments-and-CICD.md',
+            '07.-Advanced-Configuration.md',
+        ],
     },
     deployment: {
         title: 'options.deployment',
         summary:
             'Deployment automation settings: commit history depth, source/target mapping between branches and BUs, ' +
             'and branch-specific overrides. Feeds CI/CD and delta workflows.',
-        relatedWikiFiles: ['07.-Advanced-Configuration.md', '06.d-~-Git-based-deployments-and-CICD.md'],
+        relatedWikiFiles: [
+            '07.-Advanced-Configuration.md',
+            '06.d-~-Git-based-deployments-and-CICD.md',
+        ],
     },
     validations: {
         title: 'Validations (.mcdev-validations.js)',
@@ -70,7 +79,7 @@ export const CONFIG_TOPICS: Record<
 };
 
 export function listConfigTopicKeys(): string[] {
-    return Object.keys(CONFIG_TOPICS).sort();
+    return Object.keys(CONFIG_TOPICS).toSorted();
 }
 
 export function resolveTopicKey(input: string): string | undefined {

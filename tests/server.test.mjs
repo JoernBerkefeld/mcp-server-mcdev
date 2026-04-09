@@ -2,17 +2,17 @@
  * mcp-server-mcdev — unit tests for doc search, config topics, checklists, mcdev types.
  */
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import Mcdev from 'mcdev';
 import { ensureMcdevSilentJson } from '../dist/mcdev-safe.js';
 import { clearChunkCache, searchDocs } from '../dist/doc-search.js';
-import { CONFIG_TOPICS, listConfigTopicKeys, resolveTopicKey } from '../dist/config-topics.js';
+import { listConfigTopicKeys, resolveTopicKey } from '../dist/config-topics.js';
 
-const testsDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(testsDir, '..');
+const testsDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(testsDir, '..');
 
 describe('doc search', () => {
     test('finds marketList in bundled wiki', () => {
@@ -44,7 +44,7 @@ describe('config topics', () => {
 
 describe('metadata checklists JSON', () => {
     test('journey checklist has questions and deps', () => {
-        const raw = readFileSync(join(repoRoot, 'data', 'metadata-checklists.json'), 'utf8');
+        const raw = readFileSync(path.join(repoRoot, 'data', 'metadata-checklists.json'), 'utf8');
         const data = JSON.parse(raw);
         assert.ok(data.journey.questions.length >= 3);
         assert.ok(data.journey.dependentMetadataTypes.includes('senderProfile'));
