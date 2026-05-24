@@ -3,7 +3,7 @@
     "version": "0.1.1",
     "mcpName": "io.github.JoernBerkefeld/mcp-server-mcdev",
     "description": "MCP server for mcdev: SFMC DevTools wiki search, config help, metadata checklists, mcdev types.",
-    "author": "JÃ¶rn Berkefeld",
+    "author": "JÃƒÂ¶rn Berkefeld",
     "license": "MIT",
     "repository": {
         "type": "git",
@@ -48,6 +48,7 @@
         "clean": "node -e \"import fs from 'fs'; fs.rmSync('dist', { recursive: true, force: true });\"",
         "lint": "eslint .",
         "lint:fix": "eslint --fix .",
+        "prepare": "husky || true",
         "format": "prettier --write .",
         "format:check": "prettier --check ."
     },
@@ -68,8 +69,15 @@
         "eslint-plugin-prettier": "^5.5.0",
         "eslint-plugin-unicorn": "^64.0.0",
         "globals": "^17.4.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^17.0.5",
         "prettier": "^3.8.1",
         "typescript": "^5.9.0",
         "typescript-eslint": "^8.57.2"
+    },
+    "lint-staged": {
+        "*.{js,mjs,cjs,ts}": [
+            "eslint --fix"
+        ]
     }
 }
