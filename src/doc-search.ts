@@ -84,8 +84,9 @@ function tokenize(q: string): string[] {
 
 /**
  * Rank chunks by simple term overlap + heading bonus.
- * @param query
- * @param limit
+ * @param {string} query - Search query string.
+ * @param {number} limit - Maximum number of results to return.
+ * @returns {SearchHit[]} Ranked search hits sorted by descending score.
  */
 export function searchDocs(query: string, limit: number): SearchHit[] {
     const terms = tokenize(query);
