@@ -9,8 +9,10 @@ Accenture Salesforce Marketing Cloud DevTools (mcdev) is a rapid deployment/roll
 
 ## Requirements
 
-- **Node.js**: `^20.19.0 || ^22.13.0 || >=24` (LTS versions recommended)
+- **Node.js starting with v10**: `^22.22.2 || >=24.15.0` for both the CLI and generated project tooling, including the editor's ESLint runtime. Prefer a supported LTS release; Node 20, 21, 23, earlier Node 22 patches and Node 24 before 24.15.0 are unsupported by v10.
 - **Git**: Any recent version
+
+These requirements apply starting with v10; v9 requirements are unchanged. See the [v9 to v10 migration guide](/Accenture/sfmc-devtools/wiki/03.a-~-Migrating-to-v10) for tooling safeguards, `asset-email` file migration and preserving pending environment promotions. The guide describes the v10 migration and delta behavior.
 
 ## Quick start
 

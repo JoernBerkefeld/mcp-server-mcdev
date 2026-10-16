@@ -3,6 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import Mcdev from 'mcdev';
 
@@ -20,7 +21,8 @@ export function ensureMcdevSilentJson(): void {
 }
 
 export function getBundledMcdevVersion(): string {
-    const p = path.join(packageRootDir(), 'node_modules', 'mcdev', 'package.json');
+    const require = createRequire(import.meta.url);
+    const p = path.join(path.dirname(require.resolve('mcdev')), '..', 'package.json');
     const raw = fs.readFileSync(p, 'utf8');
     return (JSON.parse(raw) as { version: string }).version;
 }

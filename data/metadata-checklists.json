@@ -13,7 +13,7 @@
       },
       {
         "id": "email_activity",
-        "prompt": "For email activities: which sender profile, send classification, and transactional or classic email/asset-message assets are required? List their keys or retrieve them from the BU."
+        "prompt": "For email activities: which sender profile, send classification, and transactional or classic email/asset-email assets are required? List their keys or retrieve them from the BU."
       },
       {
         "id": "data_extension",
@@ -40,7 +40,7 @@
       "asset-mobile",
       "list",
       "email",
-      "asset-message",
+      "asset-email",
       "sendClassification",
       "senderProfile",
       "mobileApplication"

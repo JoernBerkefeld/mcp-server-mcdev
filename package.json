@@ -1,6 +1,6 @@
 {
     "name": "mcp-server-mcdev",
-    "version": "0.1.1",
+    "version": "1.0.0",
     "mcpName": "io.github.JoernBerkefeld/mcp-server-mcdev",
     "description": "MCP server for mcdev: SFMC DevTools wiki search, config help, metadata checklists, mcdev types.",
     "author": "JÃƒÂ¶rn Berkefeld",
@@ -53,12 +53,12 @@
         "format:check": "prettier --check ."
     },
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.29.0",
-        "mcdev": "^9.0.3",
+        "@modelcontextprotocol/sdk": "^1.31.0",
+        "mcdev": "^10.1.0",
         "zod": "^4.4.3"
     },
     "engines": {
-        "node": ">=20"
+        "node": "^22.22.2 || >=24.15.0"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

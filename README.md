@@ -4,6 +4,10 @@ MCP (Model Context Protocol) server for **[Accenture SFMC DevTools](https://gith
 
 Pair with **[mcp-server-sfmc](https://www.npmjs.com/package/mcp-server-sfmc)** for AMPscript / SSJS language validation and lookups.
 
+## Requirements
+
+Node.js `^22.22.2 || >=24.15.0` is required. This server uses the npm `mcdev` 10.1.0 release line; no separate global mcdev installation is required.
+
 ## MCP Registry
 
 Registered as **`io.github.JoernBerkefeld/mcp-server-mcdev`** ([quickstart](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/quickstart.mdx)). Registry hosts metadata only; the server runs locally via stdio.
@@ -16,13 +20,13 @@ CI publishes npm artifacts and registry metadata using **GitHub OIDC** ([Actions
 
 ## Tools
 
-| Tool | Purpose |
-|------|---------|
-| `mcdev_search_docs` | Search bundled sfmc-devtools wiki Markdown |
-| `mcdev_explain_config_key` | Short explanations for config topics (`markets`, `marketList`, `createDeltaPkg`, …) |
-| `mcdev_component_checklist` | Questions + dependent metadata types (`journey`, `automation`, …) |
-| `mcdev_list_metadata_types` | Types from `Mcdev.explainTypes()` (silent JSON mode — safe for MCP stdio) |
-| `read_mcdev_project_config` | Read `.mcdevrc.json` with `credentials` stripped (never reads `.mcdev-auth.json`) |
+| Tool                        | Purpose                                                                             |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `mcdev_search_docs`         | Search bundled sfmc-devtools wiki Markdown                                          |
+| `mcdev_explain_config_key`  | Short explanations for config topics (`markets`, `marketList`, `createDeltaPkg`, …) |
+| `mcdev_component_checklist` | Questions + dependent metadata types (`journey`, `automation`, …)                   |
+| `mcdev_list_metadata_types` | Types from `Mcdev.explainTypes()` (silent JSON mode — safe for MCP stdio)           |
+| `read_mcdev_project_config` | Read `.mcdevrc.json` with `credentials` stripped (never reads `.mcdev-auth.json`)   |
 
 ## Connecting AI clients
 
@@ -77,12 +81,23 @@ The **[SFMC DevTools](https://marketplace.visualstudio.com/items?itemName=Accent
 
 ## Refresh bundled wiki
 
-From this package directory, with the wiki checkout next to the repo (or set `SFMC_DEVTOOLS_WIKI`):
+Ordinary `npm run bundle-wiki`, builds, hooks and prepublish reuse the committed `bundled/wiki` without reading a sibling checkout. To deliberately refresh from the sibling `../sfmc-devtools.wiki` checkout:
 
 ```bash
+npm run bundle-wiki -- --refresh
+```
+
+For a reviewed or frozen source directory, set `SFMC_DEVTOOLS_WIKI` instead. Keep it set for subsequent builds, hooks and prepublish so every bundler invocation uses that same source:
+
+```bash
+export SFMC_DEVTOOLS_WIKI=/absolute/path/to/reviewed-wiki
 npm run bundle-wiki
 npm run build
 ```
+
+In PowerShell, use `$env:SFMC_DEVTOOLS_WIKI = 'F:\path\to\reviewed-wiki'`. A missing or empty explicitly selected source fails rather than silently falling back to another checkout.
+
+The bundled baseline is the mcdev 10.1.0 wiki commit `d0f315d6a826fe7068494e2e46e8021e26ce0915` (a commit, not a wiki tag). Four pages retain explicitly pending/unreleased extension-bundled CLI and optional-Git annotations: Getting Started, Updating mcdev, Admin Commands, and Git-based deployments and CI/CD. These annotations are not claims that those features shipped with mcdev 10.1.0. Preserve or reconcile them explicitly when refreshing; copying the released wiki alone would discard them.
 
 ## License
 
