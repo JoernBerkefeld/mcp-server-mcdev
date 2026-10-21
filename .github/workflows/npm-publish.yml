@@ -37,6 +37,9 @@ jobs:
             - run: npm ci
             - run: npm publish
 
+            - name: Wait for npm registry propagation
+              run: sleep 300
+
             - name: Install mcp-publisher
               run: |
                   set -euo pipefail
