@@ -113,6 +113,7 @@ test(
                         'businessUnit',
                         'metadataType',
                         'externalKey',
+                        'sourceRole',
                         'maxEntries',
                         'maxDepth',
                     ].toSorted()
@@ -129,6 +130,13 @@ test(
                     ].toSorted()
                 );
                 assert.deepEqual(tool.inputSchema.properties.rootKind.enum, ['retrieve', 'deploy']);
+                assert.equal(tool.inputSchema.properties.sourceRole.type, 'string');
+                assert.deepEqual(tool.inputSchema.properties.sourceRole.enum, [
+                    'html',
+                    'preheader',
+                    'text',
+                ]);
+                assert.ok(!tool.inputSchema.required.includes('sourceRole'));
                 for (const field of [
                     'workspaceRoot',
                     'credential',
@@ -157,7 +165,12 @@ test(
                     'htmlemail/templatebasedemail',
                     'customerKey',
                     'exactly one editable companion',
-                    'multiple extracts are blocked with no source and no guessed choice',
+                    'multiple companions need an explicit role',
+                    'no arbitrary filenames or paths',
+                    'only to resolved email companions',
+                    'Email html requires validate_sfmc_html',
+                    'preheader/text have language text and text-validator-not-established',
+                    'No rendering, validation',
                     'Dependencies are not confirmed',
                     'SQL validation is not established',
                     'concurrent filesystem mutation',
@@ -170,8 +183,18 @@ test(
                     { maxDepth: 13 },
                     { maxDepth: 1.5 },
                     { rootKind: 'template' },
-                ])
-                    assert.equal((await invoke(limits)).isError, true);
+                    ...[
+                        'subject',
+                        '../html',
+                        'views.html.content.asset-email-meta.html',
+                        '/html',
+                        'HTML',
+                    ].map((sourceRole) => ({ sourceRole })),
+                ]) {
+                    const response = await invoke(limits);
+                    assert.equal(response.isError, true);
+                    assert.doesNotMatch(JSON.stringify(response), /"source"/u);
+                }
             });
             await t.test(
                 'Unicode BOM, long original text and original-byte hash survive SDK transport',
@@ -215,11 +238,26 @@ test(
                     assert.equal(html.source.validation.requiredCapability, 'validate_sfmc_html');
                     const sql = await read({ metadataType: 'query' });
                     assert.equal(sql.source.language, 'sql');
+                    assert.equal(sql.source.text, 'SELECT 1 AS sample');
+                    assert.equal(
+                        sql.source.hash,
+                        createHash('sha256').update(Buffer.from('SELECT 1 AS sample')).digest('hex')
+                    );
                     assert.deepEqual(sql.source.validation, {
                         status: 'not-performed',
                         requiredCapability: 'sql-validator-not-established',
                     });
                     assert.equal(sql.source.executionReadiness, 'unknown');
+                    for (const metadataType of ['script', 'query']) {
+                        for (const sourceRole of ['html', 'preheader', 'text']) {
+                            const result = await read({ metadataType, sourceRole });
+                            assert.equal(result.status, 'blocked');
+                            assert.equal(Object.hasOwn(result, 'source'), false);
+                            assert.deepEqual(result.findings, [
+                                { code: 'unsupported-source-role' },
+                            ]);
+                        }
+                    }
                 }
             );
             await t.test(
@@ -286,6 +324,65 @@ test(
                                     (finding) => finding.code === 'unverified-source-identity'
                                 )
                             );
+                        }
+                        const emailSources = {
+                            html: emailText,
+                            preheader: '\uFEFFPreview café 漢字 😀\r\n  original spacing\n',
+                            text: '\uFEFFPlain café 漢字 😀\r\n  original text\n',
+                        };
+                        for (const [sourceRole, originalText] of Object.entries(emailSources)) {
+                            const selectedPath = path.join(
+                                directory,
+                                `views.${sourceRole}.content.asset-email-meta.${sourceRole === 'html' ? 'html' : 'amp'}`
+                            );
+                            fs.writeFileSync(selectedPath, originalText);
+                            const selected = await read({
+                                workspaceRoot: emailRoot,
+                                ...identity,
+                                sourceRole,
+                            });
+                            assert.equal(selected.status, 'resolved');
+                            assert.deepEqual(selected.source.identity, identity);
+                            assert.equal(selected.source.sourcePath, selectedPath);
+                            assert.equal(selected.source.text, originalText);
+                            assert.equal(
+                                selected.source.hash,
+                                createHash('sha256').update(Buffer.from(originalText)).digest('hex')
+                            );
+                            assert.equal(selected.source.hashBasis, 'original-file-bytes');
+                            assert.equal(
+                                selected.source.language,
+                                sourceRole === 'html' ? 'html' : 'text'
+                            );
+                            assert.equal(selected.source.rendering, 'not-performed');
+                            assert.deepEqual(selected.source.validation, {
+                                status: 'not-performed',
+                                requiredCapability:
+                                    sourceRole === 'html'
+                                        ? 'validate_sfmc_html'
+                                        : 'text-validator-not-established',
+                            });
+                            assert.equal(selected.source.executionReadiness, 'unknown');
+                        }
+                        const omitted = await read({ workspaceRoot: emailRoot, ...identity });
+                        assert.equal(omitted.status, 'blocked');
+                        assert.equal(Object.hasOwn(omitted, 'source'), false);
+                        for (const sourceRole of [
+                            '../html',
+                            'views.html.content.asset-email-meta.html',
+                            'subject',
+                        ]) {
+                            const invalid = await invoke({
+                                workspaceRoot: emailRoot,
+                                ...identity,
+                                sourceRole,
+                            });
+                            assert.equal(invalid.isError, true);
+                            assert.doesNotMatch(JSON.stringify(invalid), /"source"/u);
+                            for (const originalText of Object.values(emailSources))
+                                assert.ok(
+                                    !JSON.stringify(invalid).includes(JSON.stringify(originalText))
+                                );
                         }
                         metadata.views.html.slots = {};
                         fs.writeFileSync(metadataPath, JSON.stringify(metadata));

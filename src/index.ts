@@ -483,7 +483,7 @@ server.tool(
 
 server.tool(
     'read_mcdev_artifact_source',
-    'Read-only full-text editable-source handoff for one qualified query, script or bounded asset-email identity (htmlemail/templatebasedemail matched by customerKey with exact HTML/preheader/text extracts), never a caller-supplied file path. Requires exactly one editable companion; multiple extracts are blocked with no source and no guessed choice. Dependencies are not confirmed. Returns complete original UTF-8 text (including BOM) and SHA-256 of original file bytes without truncation; unresolved or blocked results never contain source. No rendering, validation, mutation, native modules or live execution is performed; execution readiness is unknown. The host must discover companion capabilities and coordinate platform detection, identifier lookup and full-document validate_ssjs, validate_sfmc_html or validate_ampscript as appropriate; SQL validation is not established. Do not claim companion tools were performed. Prevent concurrent filesystem mutation: bounded checks are not atomic or a concurrent-mutation sandbox. Never reads auth contents or logs.',
+    'Read-only full-text editable-source handoff for one qualified query, script or bounded asset-email identity (htmlemail/templatebasedemail matched by customerKey with exact HTML/preheader/text extracts), never a caller-supplied file path. Requires exactly one editable companion unless an explicit sourceRole selects html, preheader or text from resolved email companions; multiple companions need an explicit role or are blocked with no source and no guessed choice. sourceRole accepts no arbitrary filenames or paths and applies only to resolved email companions. Dependencies are not confirmed. Returns complete original UTF-8 text (including BOM) and SHA-256 of original file bytes without truncation; unresolved or blocked results never contain source. No rendering, validation, mutation, native modules or live execution is performed; execution readiness is unknown. The host must discover companion capabilities and coordinate platform detection, identifier lookup and full-document validate_ssjs, validate_sfmc_html or validate_ampscript as appropriate. Email html requires validate_sfmc_html; preheader/text have language text and text-validator-not-established, not an inferred AMPscript validator. SQL validation is not established. Do not claim companion tools were performed. Prevent concurrent filesystem mutation: bounded checks are not atomic or a concurrent-mutation sandbox. Never reads auth contents or logs.',
     {
         ...artifactToolSchema,
         rootKind: z.enum(['retrieve', 'deploy']),
@@ -495,14 +495,20 @@ server.tool(
                 'query, script or asset-email (bounded htmlemail/templatebasedemail layouts only).'
             ),
         externalKey: z.string(),
+        sourceRole: z.enum(['html', 'preheader', 'text']).optional(),
     },
-    ({ workspaceRoot, maxEntries, maxDepth, ...selector }) => {
+    ({ workspaceRoot, maxEntries, maxDepth, sourceRole, ...selector }) => {
         try {
             const project = readProjectConfig(workspaceRoot);
-            const result = readProjectArtifactSource(project, selector, {
-                ...(maxEntries === undefined ? {} : { maxEntries }),
-                ...(maxDepth === undefined ? {} : { maxDepth }),
-            });
+            const result = readProjectArtifactSource(
+                project,
+                selector,
+                {
+                    ...(maxEntries === undefined ? {} : { maxEntries }),
+                    ...(maxDepth === undefined ? {} : { maxDepth }),
+                },
+                sourceRole
+            );
             return { content: [{ type: 'text', text: JSON.stringify(result) }] };
         } catch {
             return {
