@@ -286,6 +286,7 @@ test(
                         'resolve_mcdev_project_artifact',
                         'read_mcdev_artifact_source',
                         'preview_mcdev_project_command',
+                        'preview_mcdev_project_config',
                     ].toSorted()
                 );
                 const all = await tool('mcdev_list_metadata_types');

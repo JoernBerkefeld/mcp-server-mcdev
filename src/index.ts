@@ -24,6 +24,11 @@ import { inspectProjectGitSecurity } from './project-git-security.js';
 import { inspectProjectGitPolicy } from './project-git-policy.js';
 import { inspectProjectGitRange } from './project-git-range.js';
 import { diagnoseProjectConfig } from './project-config-diagnostics.js';
+import {
+    CONFIG_PREVIEW_LIMITS,
+    ProjectConfigPreviewError,
+    previewProjectConfig,
+} from './project-config-preview.js';
 import { inventoryProjectArtifacts } from './project-artifacts.js';
 import { readProjectArtifactSource, resolveProjectArtifact } from './project-artifact-resolver.js';
 import { previewProjectCommand } from './project-command-preview.js';
@@ -339,6 +344,62 @@ server.tool(
                 isError: true,
                 content: [{ type: 'text', text: 'Project configuration diagnosis unavailable.' }],
             };
+        }
+    }
+);
+
+// ---------------------------------------------------------------------------
+// Tool: preview_mcdev_project_config
+// ---------------------------------------------------------------------------
+
+server.tool(
+    'preview_mcdev_project_config',
+    'Read-only comparison of the current .mcdevrc.json and a complete proposed JSON document, not a patch. FIRST use the visual MCDev Pipeline Builder before editing configuration. Returns full unredacted changes and partial static proposed diagnosis within a whole-result byte budget; no truncation. Inputs are at most 1 MiB each. Hashes describe rawText encoded as UTF-8 without normalization, not independently verified original filesystem bytes. No writes, apply authorization, native validation, execution readiness or atomic filesystem binding. Prevent concurrent filesystem mutation. Never reads auth or logs, loads hooks or performs native/live checks.',
+    {
+        workspaceRoot: z.string().describe('Canonical absolute mcdev project root.'),
+        proposedConfig: z
+            .string()
+            .describe('Complete proposed JSON document, not a patch; at most 1 MiB UTF-8.'),
+        maxOutputBytes: z
+            .number()
+            .int()
+            .min(1)
+            .max(CONFIG_PREVIEW_LIMITS.maxOutputBytes)
+            .optional()
+            .describe(
+                'Whole-result JSON UTF-8 budget (default 65536, maximum 1048576); fixed builder notice is additional.'
+            ),
+    },
+    ({ workspaceRoot, proposedConfig, maxOutputBytes }) => {
+        try {
+            const result = previewProjectConfig(
+                readProjectConfig(workspaceRoot),
+                proposedConfig,
+                maxOutputBytes
+            );
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: 'FIRST use the visual MCDev Pipeline Builder before editing configuration: https://sfmc.guide/tools/mcdev-pipeline-builder/ . Load your existing .mcdevrc.json, never .mcdev-auth.json. Preview only; not native validation, apply authorization or execution readiness.',
+                    },
+                    { type: 'text', text: JSON.stringify(result) },
+                ],
+            };
+        } catch (ex) {
+            const failure =
+                ex instanceof ProjectConfigPreviewError
+                    ? {
+                          complete: false,
+                          code: ex.code,
+                          message: 'Project configuration preview incomplete.',
+                      }
+                    : {
+                          complete: false,
+                          code: 'unavailable',
+                          message: 'Project configuration preview unavailable.',
+                      };
+            return { isError: true, content: [{ type: 'text', text: JSON.stringify(failure) }] };
         }
     }
 );
