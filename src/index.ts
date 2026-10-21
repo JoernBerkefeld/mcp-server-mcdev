@@ -22,6 +22,7 @@ import { listCommands, lookupCommand } from './command-catalog.js';
 import { ProjectInspectionError, readProjectConfig } from './project-inspection.js';
 import { inspectProjectGitSecurity } from './project-git-security.js';
 import { inspectProjectGitPolicy } from './project-git-policy.js';
+import { inspectProjectGitRange } from './project-git-range.js';
 import { diagnoseProjectConfig } from './project-config-diagnostics.js';
 import { inventoryProjectArtifacts } from './project-artifacts.js';
 import { readProjectArtifactSource, resolveProjectArtifact } from './project-artifact-resolver.js';
@@ -368,6 +369,39 @@ server.tool(
             return {
                 isError: true,
                 content: [{ type: 'text', text: 'Project Git policy inspection unavailable.' }],
+            };
+        }
+    }
+);
+
+// ---------------------------------------------------------------------------
+// Tool: inspect_mcdev_git_range
+// ---------------------------------------------------------------------------
+
+server.tool(
+    'inspect_mcdev_git_range',
+    'Read-only Git metadata comparison of two explicit refs, not promotion policy or execution readiness. Local snapshot only; remote freshness and remote BU synchronization are unknown. No inferred branch roles or backpromotions, auth/log/artifact/commit-content reads, branch changes or native mcdev/live execution. Prevent concurrent project/Git mutation; not an atomic snapshot. Separate from inspect_mcdev_project auth protection checks.',
+    {
+        workspaceRoot: z.string().describe('Canonical absolute mcdev project root.'),
+        sourceRef: z
+            .string()
+            .min(1)
+            .max(256)
+            .describe('Explicit source branch or full ref, never a revision expression.'),
+        targetRef: z
+            .string()
+            .min(1)
+            .max(256)
+            .describe('Explicit target branch or full ref, never a revision expression.'),
+    },
+    ({ workspaceRoot, sourceRef, targetRef }) => {
+        try {
+            const result = inspectProjectGitRange(workspaceRoot, sourceRef, targetRef);
+            return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        } catch {
+            return {
+                isError: true,
+                content: [{ type: 'text', text: 'Project Git range inspection unavailable.' }],
             };
         }
     }

@@ -280,6 +280,7 @@ test(
                         'read_mcdev_project_config',
                         'diagnose_mcdev_project_config',
                         'inspect_mcdev_git_policy',
+                        'inspect_mcdev_git_range',
                         'inspect_mcdev_project',
                         'inventory_mcdev_project_artifacts',
                         'resolve_mcdev_project_artifact',
