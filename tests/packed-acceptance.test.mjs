@@ -283,6 +283,7 @@ test(
                         'inspect_mcdev_project',
                         'inventory_mcdev_project_artifacts',
                         'resolve_mcdev_project_artifact',
+                        'read_mcdev_artifact_source',
                         'preview_mcdev_project_command',
                     ].toSorted()
                 );

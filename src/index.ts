@@ -24,7 +24,7 @@ import { inspectProjectGitSecurity } from './project-git-security.js';
 import { inspectProjectGitPolicy } from './project-git-policy.js';
 import { diagnoseProjectConfig } from './project-config-diagnostics.js';
 import { inventoryProjectArtifacts } from './project-artifacts.js';
-import { resolveProjectArtifact } from './project-artifact-resolver.js';
+import { readProjectArtifactSource, resolveProjectArtifact } from './project-artifact-resolver.js';
 import { previewProjectCommand } from './project-command-preview.js';
 import { ensureMcdevSilentJson, getBundledMcdevVersion } from './mcdev-safe.js';
 
@@ -472,6 +472,34 @@ server.tool(
             return {
                 isError: true,
                 content: [{ type: 'text', text: 'Project artifact resolution unavailable.' }],
+            };
+        }
+    }
+);
+
+server.tool(
+    'read_mcdev_artifact_source',
+    'Read-only full-text editable-source handoff for one qualified query/script identity, never a caller-supplied file path. Returns complete original UTF-8 text (including BOM) and SHA-256 of original file bytes without truncation; unresolved or blocked results never contain source. No rendering, validation, mutation, native modules or live execution is performed; execution readiness is unknown. The host must discover companion capabilities and coordinate platform detection, identifier lookup and full-document validate_ssjs or validate_sfmc_html as appropriate; SQL validation is not established. Do not claim companion tools were performed. Prevent concurrent filesystem mutation: bounded checks are not atomic or a concurrent-mutation sandbox. Never reads auth contents or logs.',
+    {
+        ...artifactToolSchema,
+        rootKind: z.enum(['retrieve', 'deploy']),
+        credential: z.string(),
+        businessUnit: z.string(),
+        metadataType: z.string().describe('query or script; other types return unsupported.'),
+        externalKey: z.string(),
+    },
+    ({ workspaceRoot, maxEntries, maxDepth, ...selector }) => {
+        try {
+            const project = readProjectConfig(workspaceRoot);
+            const result = readProjectArtifactSource(project, selector, {
+                ...(maxEntries === undefined ? {} : { maxEntries }),
+                ...(maxDepth === undefined ? {} : { maxDepth }),
+            });
+            return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        } catch {
+            return {
+                isError: true,
+                content: [{ type: 'text', text: 'Project artifact source unavailable.' }],
             };
         }
     }
