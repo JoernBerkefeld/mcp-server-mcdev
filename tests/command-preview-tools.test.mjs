@@ -71,9 +71,13 @@ test('command catalog tools expose reviewed declarations only', { timeout: 30_00
                     assert.equal(entry.execution.status, 'guidance-only');
                     assert.match(entry.execution.reason, /No execution adapter exists/u);
                     if (
-                        ['build', 'buildTemplate', 'buildDefinition', 'createDeltaPkg'].includes(
-                            entry.name
-                        )
+                        [
+                            'build',
+                            'buildTemplate',
+                            'buildDefinition',
+                            'buildDefinitionBulk',
+                            'createDeltaPkg',
+                        ].includes(entry.name)
                     ) {
                         assert.equal(entry.reviewedEffects.status, 'partial-source-review');
                         assert.match(entry.execution.reason, /remain unverified/u);

@@ -21,13 +21,19 @@ const contains = (text, fragments) => {
     for (const fragment of fragments) assert.ok(text.includes(fragment), fragment);
 };
 
-test('three immutable build records retain canonical/alias identity and installed source anchors', () => {
-    assert.deepEqual(Object.keys(BUILD_EFFECTS), ['build', 'buildTemplate', 'buildDefinition']);
+test('four immutable build records retain canonical/alias identity and installed source anchors', () => {
+    assert.deepEqual(Object.keys(BUILD_EFFECTS), [
+        'build',
+        'buildTemplate',
+        'buildDefinition',
+        'buildDefinitionBulk',
+    ]);
     assert.ok(Object.isFrozen(BUILD_EFFECTS));
     for (const [name, alias] of [
         ['build', 'build'],
         ['buildTemplate', 'bt'],
         ['buildDefinition', 'bd'],
+        ['buildDefinitionBulk', 'bdb'],
     ]) {
         const effects = BUILD_EFFECTS[name];
         assert.equal(lookupCommand(name), lookupCommand(alias));
@@ -36,7 +42,7 @@ test('three immutable build records retain canonical/alias identity and installe
         assert.equal(effects.status, 'partial-source-review');
         assert.ok(Object.isFrozen(effects));
         assert.ok(Object.isFrozen(effects.sourceReferences));
-        assert.equal(effects.sourceReferences.length, 15);
+        assert.equal(effects.sourceReferences.length, name === 'buildDefinitionBulk' ? 21 : 15);
         for (const { file, line, anchor } of effects.sourceReferences) {
             assert.equal(read(file.slice('mcdev/'.length)).split('\n')[line - 1].trim(), anchor);
         }
@@ -45,7 +51,99 @@ test('three immutable build records retain canonical/alias identity and installe
         assert.equal(effects.approved, undefined);
         assert.equal(effects.argv, undefined);
     }
-    assert.equal(lookupCommand('bdb').reviewedEffects, undefined);
+    assert.equal(lookupCommand('bdb').execution.status, 'guidance-only');
+});
+
+test('bulk selection, list cardinality, delegated builds and purge remain source-grounded', () => {
+    const bulkCli = between(cli, "['buildDefinitionBulk <LISTNAME>", "['selectTypes'");
+    contains(bulkCli, [
+        'Mcdev.metadataToTypeKey(argv.metadata)',
+        "if ('undefined' === typeof typeKeyCombo)",
+        'Mcdev.buildDefinitionBulk(argv.LISTNAME, argv.TYPE, csvToArray(argv.FILENAME));',
+        'Mcdev.buildDefinitionBulk(argv.LISTNAME, typeKeyCombo);',
+        ".option('skipValidation'",
+        ".option('purge'",
+        ".option('fix'",
+    ]);
+    assert.ok(!bulkCli.includes(".option('market'"));
+    assert.ok(!bulkCli.includes(".positional('MARKET'"));
+    const wrapper = between(
+        index,
+        '    static async buildDefinitionBulk(',
+        '    static async getFilesToCommit('
+    );
+    contains(wrapper, [
+        'Util.verifyMarketList(listName, properties);',
+        'const typeKeyList = Util.checkAndPrepareTypeKeyCombo(',
+        'if (Util.OPTIONS.purge)',
+        'await Builder.purgeDeployFolderList(listName);',
+        'for (const type of Object.keys(typeKeyList).toSorted())',
+        'await Builder.buildDefinitionBulk(listName, type, typeKeyList[type]);',
+    ]);
+    assert.ok(
+        wrapper.indexOf('await Builder.purgeDeployFolderList') < wrapper.indexOf('for (const type')
+    );
+    const bulk = between(
+        builder,
+        '    static async buildDefinitionBulk(',
+        '    static async purgeDeployFolderList('
+    );
+    contains(bulk, [
+        'Util.verifyMarketList(listName, properties);',
+        'for (const businessUnit in properties.marketList[listName])',
+        "if (businessUnit === 'description')",
+        "const marketList = 'string' === typeof market ? [market] : market;",
+        'for (const market of marketList)',
+        "const marketArr = 'string' === typeof market ? [market] : market;",
+        'for (const market of marketArr)',
+        'if (!Util.checkMarket(market, properties))',
+        "responseObj[businessUnit][marketArr.join('-')] = await this.buildDefinition(",
+    ]);
+    const purge = between(
+        builder,
+        '    static async purgeDeployFolderList(',
+        '    static async purgeDeployFolder(businessUnit)'
+    );
+    contains(purge, [
+        "if (businessUnit === 'description')",
+        'Util.isValidBU(properties, businessUnit, true)',
+        'await this.purgeDeployFolder(businessUnit);',
+    ]);
+    const util = read('lib/util/util.js');
+    const verify = between(util, '    verifyMarketList(', '    checkAndPrepareTypeKeyCombo(');
+    contains(verify, [
+        "if (businessUnit === 'description' || businessUnit === 'filter')",
+        "if ('string' === typeof marketArr)",
+        'marketArr = [marketArr];',
+        'for (const market of marketArr)',
+        'if (properties.markets[market])',
+        'if (!buCounter)',
+    ]);
+    const prepare = between(util, '    checkAndPrepareTypeKeyCombo(', '    signalFatalError(');
+    contains(prepare, [
+        'if (!this._isValidType(type))',
+        '!Array.isArray(selectedTypes[type]) || !selectedTypes[type].length',
+        'selectedTypes[type].sort();',
+    ]);
+    for (const block of [wrapper, bulk]) {
+        for (const absent of [
+            'confirm(',
+            'this.retrieve(',
+            '.deploy(',
+            'File.remove(',
+            'properties.directories.template =',
+        ])
+            assert.ok(!block.includes(absent), absent);
+    }
+    assert.ok(!bulk.includes("businessUnit === 'filter'"));
+    assert.ok(!purge.includes("businessUnit === 'filter'"));
+    const effects = BUILD_EFFECTS.buildDefinitionBulk;
+    assert.match(effects.markets, /flat string array is separate builds/u);
+    assert.match(effects.markets, /nested groups are not reliably accepted/u);
+    assert.match(effects.markets, /not exactly one BU\/market/u);
+    assert.match(effects.localRemoval, /before any types are built/u);
+    assert.match(effects.retrieval, /not an exhaustive transitive audit/u);
+    assert.match(effects.validationAndRemote, /dynamically import project/u);
 });
 
 test('CLI selection precedence and market overlay ordering stay source-grounded', () => {

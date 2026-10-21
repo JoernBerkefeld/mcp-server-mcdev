@@ -71,6 +71,32 @@ const shared = {
     sourceReferences,
 };
 
+const bulkSourceReferences = Object.freeze([
+    ...sourceReferences,
+    ...[
+        ['mcdev/lib/cli.js', 699, "['buildDefinitionBulk <LISTNAME> [TYPE] [FILENAME]', 'bdb'],"],
+        [
+            'mcdev/lib/index.js',
+            1569,
+            'static async buildDefinitionBulk(listName, selectedTypes, nameArr) {',
+        ],
+        [
+            'mcdev/lib/Builder.js',
+            243,
+            'static async buildDefinitionBulk(listName, type, nameArr) {',
+        ],
+        ['mcdev/lib/Builder.js', 303, 'static async purgeDeployFolderList(listName) {'],
+        ['mcdev/lib/util/util.js', 184, 'verifyMarketList(mlName, properties) {'],
+        [
+            'mcdev/lib/util/util.js',
+            229,
+            'checkAndPrepareTypeKeyCombo(selectedTypes, keyArr, commandName) {',
+        ],
+    ].map(([file, line, anchor]) =>
+        Object.freeze({ file: String(file), line: Number(line), anchor: String(anchor) })
+    ),
+]);
+
 export const BUILD_EFFECTS = Object.freeze({
     build: Object.freeze({
         ...shared,
@@ -95,5 +121,16 @@ export const BUILD_EFFECTS = Object.freeze({
             'Standalone definition does not ask the compound build purge question: only truthy purge removes configured deploy/credential/BU before building. Omitted purge skips removal; --no-purge also skips it. Native removal retries on failure and is not established as run-owned/no-link safe. Purge does not test whether deploy is a templateBuilds destination. No template-tree cleanup is present in this wrapper.',
         retrieval:
             'No explicit retrieve or deploy call occurs in the reviewed standalone wrapper or base definition body. Delegated type methods and executable validation hooks remain unreviewed for remote effects; do not infer local-only behavior. CLI exposes skipValidation, purge and fix.',
+    }),
+    buildDefinitionBulk: Object.freeze({
+        ...shared,
+        inputs: 'LISTNAME selects configured marketList entries; current configured template files supply content, not remote snapshots. CLI --metadata combos replace positional TYPE/FILENAME; otherwise FILENAME is split as CSV. Native preparation requires valid types and nonempty name arrays, sorts names, then processes types in sorted order. Each BU/market group delegates to Builder.buildDefinition, inheriting %20 decoding, subtype rejection, SDK-client provision and base validation/hooks. Result entries are indexed by BU and joined market names; duplicate group labels can overwrite response entries after repeated writes.',
+        markets:
+            'Bulk has no positional MARKET or command-specific --market option: the named marketList supplies markets. A string is one build group; a flat string array is separate builds, not one merged overlay. Builder also implements nested arrays as ordered overlay groups, with later market values winning in delegated buildDefinition. However verifyMarketList first checks each outer element via properties.markets[market], coercing array keys, so nested groups are not reliably accepted. The verifier requires at least one BU, not exactly one BU/market; it does not require a nonempty market array. It skips description and filter, whereas bulk build and purge loops skip only description. A filter entry can therefore be treated as a BU or fail; do not promise filter support or general nested-list compatibility.',
+        localRemoval:
+            'Only truthy purge calls purgeDeployFolderList before any types are built; omitted purge and --no-purge skip removal, with no compound-build confirmation in this wrapper. The purge helper walks list entries, validates each BU and delegates removal of configured deploy/credential/BU with retry, independently of templateBuilds destinations. A later invalid entry or failed build can follow earlier removals; no rollback is established. These removals are not established as run-owned/no-link safe. No temporary template redirection or template-tree cleanup occurs in the reviewed bulk wrapper/Builder bulk body.',
+        retrieval:
+            'No explicit retrieve or deploy call occurs in the reviewed bulk wrapper/Builder bulk body. It awaits delegated definition builds for each group despite a source comment suggesting otherwise. Type-specific methods, SDK helpers, executable validation hooks, implicit deployment and asset sharing remain unknown for remote scope; this is not an exhaustive transitive audit or a local-only, dry-run or unattended-safety guarantee. CLI exposes skipValidation, purge and fix.',
+        sourceReferences: bulkSourceReferences,
     }),
 });
