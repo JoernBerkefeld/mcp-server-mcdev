@@ -7,7 +7,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repo = fileURLToPath(new URL('../', import.meta.url));
 
@@ -125,13 +125,13 @@ test(
         const installed = path.join(fixture, 'node_modules', 'mcp-server-mcdev');
         assert.equal(fs.lstatSync(installed).isSymbolicLink(), false);
         assert.equal(fs.realpathSync(installed).toLowerCase(), installed.toLowerCase());
-        fs.writeFileSync(
-            path.join(fixture, '.mcdevrc.json'),
-            JSON.stringify({
-                markets: { acceptance: {} },
-                credentials: { secret: 'acceptance-secret-never-show' },
-            })
-        );
+        const configText =
+            '  {\n' +
+            ' "markets": {"acceptance": {}},\n' +
+            ' "credentials": {"secret": "acceptance-secret-return-verbatim"},\n' +
+            ' "custom": {"nested": [true, null, "preserve spacing"]}\n' +
+            '}\n';
+        fs.writeFileSync(path.join(fixture, '.mcdevrc.json'), configText);
         fs.writeFileSync(path.join(fixture, '.mcdev-auth.json'), 'acceptance-auth-never-read');
         await t.test('installed versions, Node floors and wiki content match release', () => {
             const pkg = json(path.join(installed, 'package.json'));
@@ -263,30 +263,223 @@ test(
                 JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n'
             );
         });
-        await t.test('lists all five tools and filters metadata matching/nonmatching', async () => {
-            const result = await request('tools/list');
-            assert.deepEqual(
-                result.tools.map((entry) => entry.name).toSorted(),
-                [
-                    'mcdev_search_docs',
-                    'mcdev_explain_config_key',
-                    'mcdev_component_checklist',
-                    'mcdev_list_metadata_types',
-                    'read_mcdev_project_config',
-                ].toSorted()
+        await t.test(
+            'preserves existing tools, adds section retrieval and filters metadata',
+            async () => {
+                const result = await request('tools/list');
+                assert.deepEqual(
+                    result.tools.map((entry) => entry.name).toSorted(),
+                    [
+                        'mcdev_search_docs',
+                        'mcdev_get_doc_section',
+                        'mcdev_explain_config_key',
+                        'mcdev_component_checklist',
+                        'mcdev_list_metadata_types',
+                        'mcdev_list_commands',
+                        'mcdev_get_command',
+                        'read_mcdev_project_config',
+                        'diagnose_mcdev_project_config',
+                        'inspect_mcdev_git_policy',
+                        'inspect_mcdev_project',
+                        'inventory_mcdev_project_artifacts',
+                        'resolve_mcdev_project_artifact',
+                        'preview_mcdev_project_command',
+                    ].toSorted()
+                );
+                const all = await tool('mcdev_list_metadata_types');
+                assert.match(all, /^mcdev 10\.1\.0 — \d+ type\(s\)/);
+                assert.match(all, /\*\*journey\*\*/);
+                const matching = await tool('mcdev_list_metadata_types', { filter: 'JoUrNeY' });
+                assert.match(matching, /mcdev 10\.1\.0 — 2 type\(s\)/);
+                assert.match(matching, /\*\*event\*\*/);
+                assert.match(matching, /\*\*journey\*\*/);
+                assert.match(
+                    await tool('mcdev_list_metadata_types', { filter: 'no-such-type-acceptance' }),
+                    /0 type\(s\)[\s\S]*No types match the filter/
+                );
+            }
+        );
+        await t.test('search source IDs resolve to complete bounded section pages', async () => {
+            const { getChunks, getDocExcerpt } = await import(
+                pathToFileURL(path.join(installed, 'dist', 'doc-search.js')).href
             );
-            const all = await tool('mcdev_list_metadata_types');
-            assert.match(all, /^mcdev 10\.1\.0 — \d+ type\(s\)/);
-            assert.match(all, /\*\*journey\*\*/);
-            const matching = await tool('mcdev_list_metadata_types', { filter: 'JoUrNeY' });
-            assert.match(matching, /mcdev 10\.1\.0 — 2 type\(s\)/);
-            assert.match(matching, /\*\*event\*\*/);
-            assert.match(matching, /\*\*journey\*\*/);
-            assert.match(
-                await tool('mcdev_list_metadata_types', { filter: 'no-such-type-acceptance' }),
-                /0 type\(s\)[\s\S]*No types match the filter/
-            );
+            const search = await tool('mcdev_search_docs', { query: 'marketList', limit: 3 });
+            const ids = [...search.matchAll(/\*\*Source ID:\*\* (.+)/g)].map((match) => match[1]);
+            assert.ok(ids.length > 0);
+            for (const id of ids) {
+                const chunk = getChunks().find((entry) => entry.id === id);
+                assert.ok(chunk, id);
+                const excerpt = getDocExcerpt(chunk, 'marketList');
+                assert.ok(search.includes(excerpt.text));
+                assert.ok(
+                    search.includes(`${excerpt.start}-${excerpt.end}/${excerpt.totalLength}`)
+                );
+                let offset = 0;
+                let complete = '';
+                do {
+                    const page = JSON.parse(
+                        await tool('mcdev_get_doc_section', { id, offset, limit: 137 })
+                    );
+                    assert.equal(page.id, id);
+                    assert.equal(page.file, chunk.file);
+                    assert.equal(page.heading, chunk.heading);
+                    assert.equal(page.start, offset);
+                    assert.ok(page.text.length <= 137);
+                    assert.equal(page.end, offset + page.text.length);
+                    assert.equal(page.totalLength, chunk.body.length);
+                    assert.equal(page.text, chunk.body.slice(page.start, page.end));
+                    complete += page.text;
+                    offset = page.nextOffset;
+                    assert.equal(offset, page.end < page.totalLength ? page.end : null);
+                } while (offset !== null);
+                assert.equal(complete, chunk.body);
+                const end = JSON.parse(
+                    await tool('mcdev_get_doc_section', { id, offset: chunk.body.length + 1 })
+                );
+                assert.equal(end.text, '');
+                assert.equal(end.nextOffset, null);
+            }
+            const missing = await request('tools/call', {
+                name: 'mcdev_get_doc_section',
+                arguments: { id: 'missing-private-section' },
+            });
+            assert.equal(missing.isError, true);
+            assert.equal(missing.content[0].text, 'Documentation section unavailable.');
+            for (const args of [{ offset: -1 }, { limit: 0 }, { limit: 12001 }]) {
+                const invalid = await request('tools/call', {
+                    name: 'mcdev_get_doc_section',
+                    arguments: { id: ids[0], ...args },
+                });
+                assert.equal(invalid.isError, true);
+                assert.doesNotMatch(JSON.stringify(invalid), /RangeError|node:fs|ENOENT/);
+            }
         });
+        await t.test(
+            'config failures expose only safe codes, never paths or auth content',
+            async () => {
+                for (const [workspaceRoot, code] of [
+                    [archive, 'missing-config'],
+                    ['relative-private-path', 'unsafe-path'],
+                    [path.join(fixture, '.mcdev-auth.json'), 'unsafe-path'],
+                ]) {
+                    const result = await request('tools/call', {
+                        name: 'read_mcdev_project_config',
+                        arguments: { workspaceRoot },
+                    });
+                    assert.equal(result.isError, true);
+                    assert.equal(
+                        result.content[0].text,
+                        `Project configuration unavailable: ${code}.`
+                    );
+                    assert.doesNotMatch(
+                        JSON.stringify(result),
+                        /acceptance-auth-never-read|ENOENT/
+                    );
+                }
+            }
+        );
+        await t.test(
+            'project inspection preserves full config and reports unverified Git safely',
+            async () => {
+                const result = await request('tools/call', {
+                    name: 'inspect_mcdev_project',
+                    arguments: { workspaceRoot: fixture },
+                });
+                assert.notEqual(result.isError, true);
+                const report = JSON.parse(result.content[1].text);
+                assert.equal(report.rawText, configText);
+                assert.deepEqual(report.config, JSON.parse(configText));
+                assert.equal(report.gitSecurity.status, 'unverified');
+                assert.deepEqual(report.gitSecurity.tracking, { verified: false, tracked: null });
+                assert.equal(report.gitSecurity.ignore.verified, false);
+                assert.match(
+                    result.content[0].text,
+                    /CRITICAL[\s\S]*Do not treat this project as protected/
+                );
+                assert.match(result.content[0].text, /Request explicit user approval/);
+                assert.doesNotMatch(
+                    JSON.stringify(result),
+                    /fatal:|not a git repository|acceptance-auth-never-read/
+                );
+                const invalid = await request('tools/call', {
+                    name: 'inspect_mcdev_project',
+                    arguments: { workspaceRoot: 'private-relative-project' },
+                });
+                assert.equal(invalid.isError, true);
+                assert.equal(
+                    invalid.content[0].text,
+                    'Project inspection unavailable: unsafe-path.'
+                );
+            }
+        );
+        await t.test(
+            'project inspection distinguishes missing policy from effective project ignore',
+            async () => {
+                /**
+                 * Execute fixture-only Git setup without reading auth or history.
+                 * @param args - Synthetic repository setup arguments.
+                 * @returns {void} Nothing.
+                 */
+                function fixtureGit(args) {
+                    const result = spawnSync('git', args, {
+                        cwd: fixture,
+                        encoding: 'utf8',
+                        timeout: 5000,
+                    });
+                    assert.ifError(result.error);
+                    assert.equal(result.status, 0, result.stderr);
+                }
+                fixtureGit(['init']);
+                fixtureGit(['config', '--local', 'user.name', 'Jörn Berkefeld']);
+                fixtureGit(['config', '--local', 'user.email', 'joern.berkefeld@gmail.com']);
+                const excludes = path.join(fixture, 'empty-excludes');
+                fs.writeFileSync(excludes, '');
+                fixtureGit(['config', '--local', 'core.excludesFile', excludes]);
+                const missing = await request('tools/call', {
+                    name: 'inspect_mcdev_project',
+                    arguments: { workspaceRoot: fixture },
+                });
+                const missingReport = JSON.parse(missing.content[1].text);
+                assert.equal(missingReport.rawText, configText);
+                assert.equal(missingReport.gitSecurity.status, 'critical');
+                assert.equal(missingReport.gitSecurity.ignore.verified, true);
+                assert.equal(missingReport.gitSecurity.ignore.portableProjectProtection, false);
+                assert.deepEqual(missingReport.gitSecurity.tracking, {
+                    verified: true,
+                    tracked: false,
+                });
+                assert.match(
+                    missing.content[0].text,
+                    /CRITICAL[\s\S]*Request explicit user approval/
+                );
+                assert.equal(fs.existsSync(path.join(fixture, '.gitignore')), false);
+                fs.writeFileSync(path.join(fixture, '.gitignore'), '.mcdev-auth.json\n');
+                const protectedResult = await request('tools/call', {
+                    name: 'inspect_mcdev_project',
+                    arguments: { workspaceRoot: fixture },
+                });
+                const protectedReport = JSON.parse(protectedResult.content[1].text);
+                assert.equal(protectedReport.rawText, configText);
+                assert.deepEqual(protectedReport.config, JSON.parse(configText));
+                assert.equal(protectedReport.gitSecurity.status, 'protected');
+                assert.equal(protectedReport.gitSecurity.ignore.source, 'project');
+                assert.equal(protectedReport.gitSecurity.ignore.portableProjectProtection, true);
+                assert.deepEqual(protectedReport.gitSecurity.tracking, {
+                    verified: true,
+                    tracked: false,
+                });
+                assert.deepEqual(protectedReport.gitSecurity.findings, []);
+                assert.doesNotMatch(JSON.stringify(protectedResult), /acceptance-auth-never-read/);
+                assert.equal(
+                    await tool('read_mcdev_project_config', { workspaceRoot: fixture }),
+                    configText
+                );
+                assert.equal(
+                    fs.readFileSync(path.join(fixture, '.gitignore'), 'utf8'),
+                    '.mcdev-auth.json\n'
+                );
+            }
+        );
         await t.test('reads bundled wiki, searches docs and returns planning prompt', async () => {
             const resource = await request('resources/read', { uri: 'mcdev://wiki/index' });
             assert.match(resource.contents[0].text, /Bundled wiki files \(16\)/);
@@ -304,8 +497,13 @@ test(
             assert.match(prompt.messages[0].content.text, /acceptance journey deployment/);
             assert.match(prompt.messages[0].content.text, /mcdev_search_docs/);
             const config = await tool('read_mcdev_project_config', { workspaceRoot: fixture });
-            assert.match(config, /acceptance/);
-            assert.doesNotMatch(config, /acceptance-secret-never-show|acceptance-auth-never-read/);
+            assert.equal(config, configText);
+            assert.deepEqual(JSON.parse(config), JSON.parse(configText));
+            assert.doesNotMatch(config, /acceptance-auth-never-read/);
+            assert.match(
+                prompt.messages[0].content.text,
+                /do not claim those operations were performed/
+            );
         });
     }
 );

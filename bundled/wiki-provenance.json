@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "revision": "46b6c453f4d9e373a133e0c2b43e2f2af5812275",
+    "dirty": true,
+    "localReviewStatus": "not-reviewed"
+  },
+  "mcdevVersion": "10.1.0",
+  "pages": {
+    "02.-Getting-Started.md": "50839d50edf3c11c93a25f8d9401873b418496b72911d23e6b65d7ed22c46083",
+    "03.-Updating-mcdev.md": "c71e69cc2b59b333ca2e3c4f95e5e1fafb9e51d4926371d54b6c6c1f7d7aa4f8",
+    "03.a-~-Migrating-to-v10.md": "d0a6aa7cf0e3238847741fc9ae861e0e98df573b6f3c50ef8ede5153473c4867",
+    "04.-Troubleshooting.md": "86f33fbef6255a73486f518ecb3bb8273c8149853b7fd1a65c0049a1ef359800",
+    "05.-Metadata-Type-Support.md": "9e2e84a8ddab5ad700059d7e549906a0a75e35313012bc33dd0e2d2310ca59b8",
+    "06.-Commands.md": "87f56aa147fec38bb74a99100d213de3e6d5f15c46d9df0d6f94d21bfc0adf90",
+    "06.a-~-Admin-Commands.md": "e75d0f2ef4bef4dec8379562cc910b925e92c43038c38340779f62a535b1d18e",
+    "06.b-~-Standard-Commands.md": "8c2fb952e362986a8b1ea33411750076aa58c1c327171e1cff0af9f94381c971",
+    "06.c-~-Templating-Commands.md": "12bc3735ec878765acdb2a6204eac7a91d0302c90acfc2da9a2793057af6541e",
+    "06.d-~-Git-based-deployments-and-CICD.md": "33282808ea68c3ce41f104e8b78799b46fe6def4a73b2af4c99e00fea6ab9fd1",
+    "07.-Advanced-Configuration.md": "cec1d2f026e72488c878051a3740e18cbda4ff31fae6241ebf4ea29da2d0ffcf",
+    "08.-Metadata-specific-settings-&-options.md": "3e9e04fdf412fc5313009688c538cd280e7eec5dd5f74fc334b2914aec8c2198",
+    "09.-Examples.md": "68096022e325f0901de01bc81bbc6ec8a3988bfcaf0cf6909c988f9fe602f7f1",
+    "10.-Contribute.md": "9636877140bb907b2d96e3156cf544ea8352d6c247c1026fbfde85cf25545264",
+    "Home.md": "9dbe6ca30381125bc6d75485f85559d2ed53a8d6479deed55db7e8c94cc39689",
+    "_Footer.md": "64e3be27b0e18da99f9524fe997c047e8f2546201a567b1a8151402a13a1ed09"
+  }
+}
