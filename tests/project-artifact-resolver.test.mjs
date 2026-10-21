@@ -64,6 +64,146 @@ function companion(project, type = 'query', extension = 'sql', extra = '') {
     return file(project, `custom/in/sample/example/${type}/${extra}demo.${type}-meta.${extension}`);
 }
 
+const emailSelector = { ...selector, metadataType: 'asset-email' };
+function email(project, options = {}) {
+    const {
+        credential = 'sample',
+        stem = 'demo',
+        key = 'demo',
+        nested = true,
+        assetType = 'htmlemail',
+        views = { html: {}, preheader: {}, text: {} },
+    } = options;
+    const base = `custom/in/${credential}/example/asset/email`;
+    const directory = nested ? `${base}/${key}` : base;
+    const metadataPath = file(
+        project,
+        `${directory}/${stem}.asset-email-meta.json`,
+        JSON.stringify({
+            customerKey: key,
+            key: 'not-the-customer-key',
+            assetType: { name: assetType },
+            views,
+        })
+    );
+    return {
+        metadataPath,
+        source: (view = 'html', extension = view === 'html' ? 'html' : 'amp') =>
+            file(project, `${base}/${key}/views.${view}.content.asset-email-meta.${extension}`),
+    };
+}
+
+test('email customerKey resolves native top-level extracts in both metadata layouts', () => {
+    for (const nested of [true, false]) {
+        for (const assetType of ['htmlemail', 'templatebasedemail']) {
+            const project = fixture();
+            const asset = email(project, { nested, assetType });
+            const source = asset.source();
+            email(project, { credential: 'second' }).source();
+            const result = resolveProjectArtifact(project, emailSelector);
+            assert.equal(result.status, 'resolved');
+            assert.deepEqual(result.metadataPaths, [asset.metadataPath]);
+            assert.deepEqual(result.editableCompanions, [
+                { absolutePath: source, language: 'html', role: 'source' },
+            ]);
+            assert.deepEqual(result.declaredDependencies, [
+                'folder-asset',
+                'folder-asset-shared',
+                'folder-cloudpages',
+            ]);
+            assert.deepEqual(result.locallyConfirmedDependencies, []);
+            assert.equal(result.dependencyResolution, 'not-evaluated');
+            assert.equal(
+                readProjectArtifactSource(project, emailSelector).source.sourcePath,
+                source
+            );
+            assert.equal(
+                resolveProjectArtifact(project, {
+                    ...emailSelector,
+                    externalKey: 'not-the-customer-key',
+                }).status,
+                'missing'
+            );
+            assert.equal(
+                resolveProjectArtifact(project, { ...emailSelector, credential: 'second' }).status,
+                'resolved'
+            );
+        }
+    }
+});
+
+test('email multiple verified extracts stay explicit and never choose one source', () => {
+    const project = fixture();
+    const asset = email(project);
+    asset.source();
+    asset.source('preheader');
+    asset.source('text');
+    const result = resolveProjectArtifact(project, emailSelector);
+    assert.equal(result.status, 'resolved');
+    assert.deepEqual(
+        result.editableCompanions.map((source) => source.language),
+        ['html', 'ampscript', 'ampscript']
+    );
+    const handoff = readProjectArtifactSource(project, emailSelector);
+    assert.equal(handoff.status, 'blocked');
+    assert.equal(handoff.source, undefined);
+    assert.ok(handoff.findings.some((finding) => finding.code === 'unverified-source-identity'));
+});
+
+test('email missing, mismatched, duplicate and unsupported layouts do not authorize edits', () => {
+    for (const kind of [
+        'missing',
+        'filename',
+        'duplicate',
+        'slots',
+        'textonly',
+        'inline',
+        'extra',
+    ]) {
+        const project = fixture();
+        const asset = email(project, {
+            ...(kind === 'filename' ? { stem: 'different' } : {}),
+            ...(kind === 'slots' ? { views: { html: { slots: {} } } } : {}),
+            ...(kind === 'inline' ? { views: { html: { content: 'inert inline marker' } } } : {}),
+            ...(kind === 'textonly' ? { assetType: 'textonlyemail' } : {}),
+        });
+        if (kind !== 'missing') asset.source();
+        if (kind === 'duplicate') email(project, { nested: false });
+        if (kind === 'extra') asset.source('html', 'ssjs');
+        const result = resolveProjectArtifact(project, emailSelector);
+        assert.equal(result.status, 'ambiguous', kind);
+        assert.deepEqual(result.editableCompanions, [], kind);
+        assert.equal(readProjectArtifactSource(project, emailSelector).source, undefined, kind);
+    }
+});
+
+test('email unsafe extracts fail inventory before opening any content', () => {
+    for (const kind of ['hardlink', 'junction', 'private']) {
+        const project = fixture();
+        const asset = email(project);
+        const source = asset.source();
+        if (kind === 'hardlink') fs.linkSync(source, `${source}.alias`);
+        if (kind === 'junction') {
+            const outside = fs.mkdtempSync(path.join(runRoot, 'outside-'));
+            fs.symlinkSync(outside, path.join(path.dirname(source), 'alias'), 'junction');
+        }
+        if (kind === 'private')
+            file(project, 'custom/in/sample/example/asset/email/demo/logs/marker');
+        const original = fs.openSync;
+        let opens = 0;
+        fs.openSync = () => {
+            opens++;
+            throw new Error('Denied before access');
+        };
+        try {
+            assert.equal(readProjectArtifactSource(project, emailSelector).status, 'blocked');
+            assert.equal(opens, 0);
+        } finally {
+            fs.openSync = original;
+        }
+    }
+});
+
 test('source handoff preserves full Unicode/BOM bytes, identity and honest capability state', () => {
     for (const [type, language, capability] of [
         ['query', 'sql', 'sql-validator-not-established'],
@@ -298,7 +438,7 @@ test('unsupported types and selectors never open project content', () => {
         throw new Error('No opens');
     };
     try {
-        for (const metadataType of ['asset-email', 'automation', 'dataExtension', 'unknown'])
+        for (const metadataType of ['asset', 'automation', 'dataExtension', 'unknown'])
             assert.equal(
                 resolveProjectArtifact(project, { ...selector, metadataType }).status,
                 'unsupported'

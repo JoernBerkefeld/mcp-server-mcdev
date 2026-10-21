@@ -18,7 +18,7 @@ export interface ArtifactResolution {
     metadataPaths: string[];
     editableCompanions: {
         absolutePath: string;
-        language: 'sql' | 'ssjs' | 'html';
+        language: 'sql' | 'ssjs' | 'html' | 'ampscript';
         role: 'source';
     }[];
     declaredDependencies: string[];
@@ -33,6 +33,10 @@ export interface ArtifactResolution {
 const supported = {
     query: { extensions: ['sql'], dependencies: ['folder-queryactivity', 'dataExtension'] },
     script: { extensions: ['ssjs', 'html'], dependencies: ['folder-ssjsactivity'] },
+    'asset-email': {
+        extensions: ['html', 'amp'],
+        dependencies: ['folder-asset', 'folder-asset-shared', 'folder-cloudpages'],
+    },
 } as const;
 const MAX_BYTES = 1024 * 1024;
 const privateNames = new Set(['.mcdev-auth.json', '.git', '.mcdev', 'logs']);
@@ -165,7 +169,7 @@ export interface ProjectArtifactSource {
         rootKind: ArtifactSelector['rootKind'];
         sourcePath: string;
         role: 'editable-source';
-        language: 'sql' | 'ssjs' | 'html';
+        language: 'sql' | 'ssjs' | 'html' | 'ampscript';
         text: string;
         hash: string;
         hashAlgorithm: 'sha256';
@@ -174,7 +178,10 @@ export interface ProjectArtifactSource {
         validation: {
             status: 'not-performed';
             requiredCapability:
-                'sql-validator-not-established' | 'validate_ssjs' | 'validate_sfmc_html';
+                | 'sql-validator-not-established'
+                | 'validate_ssjs'
+                | 'validate_sfmc_html'
+                | 'validate_ampscript';
         };
         executionReadiness: 'unknown';
         limitations: string[];
@@ -235,7 +242,9 @@ export function readProjectArtifactSource(
                         ? 'sql-validator-not-established'
                         : companion.language === 'ssjs'
                           ? 'validate_ssjs'
-                          : 'validate_sfmc_html',
+                          : companion.language === 'ampscript'
+                            ? 'validate_ampscript'
+                            : 'validate_sfmc_html',
             },
             executionReadiness: 'unknown',
             limitations: [
@@ -250,6 +259,83 @@ export function readProjectArtifactSource(
         result.findings.push({ code: 'unverified-source-content-or-path' });
     }
     return result;
+}
+
+/**
+ * Associate only proven top-level HTML email extracts, not arbitrary files in an asset folder.
+ * Installed Asset.definition.js:3-10,741; Asset.js:1561-1667,2336-2379,2733-2808.
+ * Native commit candidates include nonexistent extension alternatives; those are not sources.
+ * @param root - Canonical project root.
+ * @param metadataPath - Verified metadata path.
+ * @param metadata - Parsed metadata matched by customerKey.
+ * @param files - Inventoried files in the qualified email subtype.
+ * @param result - Resolution receiving verified associations or explicit findings.
+ */
+function associateEmail(
+    root: string,
+    metadataPath: string,
+    metadata: Record<string, unknown>,
+    files: { absolutePath: string }[],
+    result: ArtifactResolution
+): void {
+    const assetType = metadata.assetType as { name?: unknown } | undefined;
+    const views = metadata.views as
+        Record<string, { slots?: unknown; content?: unknown }> | undefined;
+    if (
+        !['htmlemail', 'templatebasedemail'].includes(String(assetType?.name)) ||
+        !views ||
+        typeof views !== 'object' ||
+        !views.html ||
+        typeof views.html !== 'object' ||
+        views.html.slots !== undefined
+    ) {
+        result.findings.push({ code: 'unsupported-email-layout' });
+        return;
+    }
+    const key = metadata.customerKey as string;
+    const directory = path.dirname(metadataPath);
+    const sourceDirectory =
+        path.basename(path.dirname(directory)) === 'asset' ? path.join(directory, key) : directory;
+    const expected = [
+        ['html', 'html'],
+        ['preheader', 'amp'],
+        ['text', 'amp'],
+    ] as const;
+    for (const [view, extension] of expected) {
+        const candidate = path.join(
+            sourceDirectory,
+            `views.${view}.content.asset-email-meta.${extension}`
+        );
+        const found = files.some((file) => file.absolutePath === candidate);
+        if (found && (!views[view] || typeof views[view] !== 'object')) {
+            result.findings.push({ code: 'unsupported-email-layout' });
+            continue;
+        }
+        // Inline content is not proof that a companion is the native editable source.
+        if (views[view]?.content !== undefined || (view === 'html' && !found)) {
+            result.findings.push({ code: found ? 'inline-source-conflict' : 'missing-companion' });
+            continue;
+        }
+        if (!found) continue;
+        checkedFile(root, candidate);
+        result.editableCompanions.push({
+            absolutePath: candidate,
+            language: extension === 'html' ? 'html' : 'ampscript',
+            role: 'source',
+        });
+    }
+    // Anything else under this asset may be an unimplemented extract: never silently select HTML.
+    if (
+        files.some(
+            (file) =>
+                file.absolutePath.startsWith(`${sourceDirectory}${path.sep}`) &&
+                file.absolutePath !== metadataPath &&
+                !result.editableCompanions.some(
+                    (source) => source.absolutePath === file.absolutePath
+                )
+        )
+    )
+        result.findings.push({ code: 'unsupported-email-layout' });
 }
 
 /**
@@ -298,7 +384,9 @@ export function resolveProjectArtifact(
             item.rootKind === selector.rootKind &&
             item.credential === selector.credential &&
             item.businessUnit === selector.businessUnit &&
-            item.metadataType === selector.metadataType
+            (selector.metadataType === 'asset-email'
+                ? item.metadataType === 'asset' && item.assetSubtype === 'email'
+                : item.metadataType === selector.metadataType)
     );
     for (const item of scoped) {
         if (
@@ -310,7 +398,9 @@ export function resolveProjectArtifact(
             const metadata = readMetadata(project.projectRoot, item.absolutePath);
             if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
                 throw new Error('invalid-metadata');
-            const key = (metadata as Record<string, unknown>).key;
+            const email = selector.metadataType === 'asset-email';
+            const record = metadata as Record<string, unknown>;
+            const key = record[email ? 'customerKey' : 'key'];
             if (typeof key !== 'string' || !key) throw new Error('invalid-metadata');
             if (key !== selector.externalKey) continue;
             result.metadataPaths.push(item.absolutePath);
@@ -320,9 +410,12 @@ export function resolveProjectArtifact(
                 (directories?.[selector.rootKind] as string | undefined) ?? selector.rootKind,
                 selector.credential,
                 selector.businessUnit,
-                selector.metadataType
+                ...(email ? ['asset', 'email'] : [selector.metadataType])
             );
-            if (path.dirname(item.absolutePath) !== typeDirectory) {
+            if (
+                path.dirname(item.absolutePath) !== typeDirectory &&
+                !(email && path.dirname(item.absolutePath) === path.join(typeDirectory, key))
+            ) {
                 result.findings.push({
                     code: 'unsupported-nested-layout',
                     path: item.relativePath,
@@ -331,6 +424,10 @@ export function resolveProjectArtifact(
             }
             if (item.metadataFilename.stem !== key) {
                 result.findings.push({ code: 'filename-key-mismatch', path: item.relativePath });
+                continue;
+            }
+            if (email) {
+                associateEmail(project.projectRoot, item.absolutePath, record, scoped, result);
                 continue;
             }
             const companions = scoped.filter(
