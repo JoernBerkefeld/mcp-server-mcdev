@@ -95,6 +95,9 @@ test('every canonical name and alias resolves uniquely to an immutable guidance-
         assert.equal(command.execution.status, 'guidance-only');
         if (command.name === 'createDeltaPkg') {
             assert.match(command.execution.reason, /Only partial createDeltaPkg effects/u);
+        } else if (['build', 'buildTemplate', 'buildDefinition'].includes(command.name)) {
+            assert.match(command.execution.reason, /Only partial build-family effects/u);
+            assert.equal(command.reviewedEffects.status, 'partial-source-review');
         } else {
             assert.deepEqual(command.execution, {
                 status: 'guidance-only',

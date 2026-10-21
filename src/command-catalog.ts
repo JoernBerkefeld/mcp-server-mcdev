@@ -1,3 +1,5 @@
+import { BUILD_EFFECTS } from './build-effects.js';
+
 /** Factual declaration inventory; never imports or executes the mcdev CLI. */
 export const REVIEWED_MCDEV_VERSION = '10.1.0' as const;
 export const COMMAND_CATALOG_SOURCE = 'mcdev/lib/cli.js' as const;
@@ -94,7 +96,8 @@ export interface CommandCatalogEntry {
     readonly aliases: readonly string[];
     readonly reviewedVersion: typeof REVIEWED_MCDEV_VERSION;
     readonly sourceReferences: readonly CommandSourceReference[];
-    readonly reviewedEffects?: typeof deltaEffects;
+    readonly reviewedEffects?:
+        typeof deltaEffects | (typeof BUILD_EFFECTS)[keyof typeof BUILD_EFFECTS];
     readonly execution: {
         readonly status: 'guidance-only';
         readonly reason: string;
@@ -160,7 +163,16 @@ const catalog: readonly CommandCatalogEntry[] = Object.freeze(
                           reason: 'No execution adapter exists. Only partial createDeltaPkg effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
                       }),
                   }
-                : { execution }),
+                : signature.split(' ')[0] in BUILD_EFFECTS
+                  ? {
+                        reviewedEffects:
+                            BUILD_EFFECTS[signature.split(' ')[0] as keyof typeof BUILD_EFFECTS],
+                        execution: Object.freeze({
+                            status: 'guidance-only' as const,
+                            reason: 'No execution adapter exists. Only partial build-family effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
+                        }),
+                    }
+                  : { execution }),
         })
     )
 );

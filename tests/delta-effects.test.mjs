@@ -23,12 +23,12 @@ test('reviewed effects are pinned to the installed version and exact native sour
     }
 });
 
-test('only createDeltaPkg has the exact partial review fields and aliases share its record', () => {
+test('reviewed commands retain the exact delta fields and aliases share its record', () => {
     assert.deepEqual(
         listCommands()
             .filter((entry) => entry.reviewedEffects)
             .map((entry) => entry.name),
-        ['createDeltaPkg']
+        ['build', 'buildTemplate', 'buildDefinition', 'createDeltaPkg']
     );
     assert.deepEqual(Object.keys(effects), [
         'status',
