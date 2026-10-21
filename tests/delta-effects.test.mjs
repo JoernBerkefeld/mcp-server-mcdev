@@ -28,7 +28,14 @@ test('reviewed commands retain the exact delta fields and aliases share its reco
         listCommands()
             .filter((entry) => entry.reviewedEffects)
             .map((entry) => entry.name),
-        ['build', 'buildTemplate', 'buildDefinition', 'buildDefinitionBulk', 'createDeltaPkg']
+        [
+            'clone',
+            'build',
+            'buildTemplate',
+            'buildDefinition',
+            'buildDefinitionBulk',
+            'createDeltaPkg',
+        ]
     );
     assert.deepEqual(Object.keys(effects), [
         'status',

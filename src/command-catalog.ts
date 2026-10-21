@@ -88,6 +88,43 @@ const deltaEffects = Object.freeze({
     ]),
 });
 
+// Clone delegates to compound build; retain its reviewed effects without duplicating the audit.
+const cloneEffects = Object.freeze({
+    ...BUILD_EFFECTS.build,
+    inputs: 'CLI requires --metadata (-m, string array) and --buFrom (-bf). --buTo (-bt) is not CLI-demanded, but clone calls non-bulk build, which rejects an absent target. Clone has no command aliases and no command-specific bulk, market, fix or shareAsset options. Native metadataToTypeKey accepts key/id/name identifiers, but downstream support is not established for every identifier/type; build requires valid types and nonempty key arrays. Template name: selectors resolve against current retrieved JSON, not a remote snapshot.',
+    markets:
+        'clone forwards source BU, target BU and parsed type/key selections to build with both market arrays fixed to [__clone__], without bulk or filter arguments. Native market checks and both Builder stages bypass market substitutions for this sentinel. This is a template/definition pipeline, not a byte-for-byte local copy or a promise that names and keys stay unchanged: base template processing prunes fields and delegates nested content; definition output filenames use the resulting metadata key after validation. Type-specific key/name rewriting remains unknown.',
+    interaction:
+        'Missing or unknown credential/BU selectors can reach Cli._selectBU prompts. Unknown explicit credential/BU values throw when skipInteraction is set, but missing BU selection has no equivalent guard before _selectBU. Compound build also asks default-yes purge when purge is not boolean, without a skipInteraction guard. --no-purge avoids that removal/question, not validation hooks, retrieval or every possible delegated prompt. Unattended prerequisites remain unverified.',
+    retrieval:
+        'CLI exposes dependencies (-D), retrieve (-r), skipValidation (-sv) and purge. Template stage calls _reRetrieve with alwaysAsk false when dependencies is not enabled; truthy retrieve performs remote retrieval and can replace local inputs. addDependencies and addDependentCbReferences are also invoked. The reviewed clone/build wrappers contain no explicit deploy call, but type-specific methods, dependency helpers, executable validations, implicit deployments and remote writes remain unknown; do not classify clone as local-only.',
+    sourceReferences: Object.freeze([
+        ...BUILD_EFFECTS.build.sourceReferences,
+        ...[
+            ['mcdev/lib/cli.js', 381, "['clone'],"],
+            [
+                'mcdev/lib/index.js',
+                1181,
+                'static async clone(businessUnitTemplate, businessUnitDefinition, typeKeyCombo) {',
+            ],
+            ['mcdev/lib/index.js', 2462, 'static metadataToTypeKey('],
+            [
+                'mcdev/lib/util/cli.js',
+                156,
+                'async getCredentialObject(properties, target, isCredentialOnly, allowAll) {',
+            ],
+            [
+                'mcdev/lib/util/cli.js',
+                236,
+                'async _selectBU(properties, credential, isCredentialOnly, allowAll) {',
+            ],
+            ['mcdev/lib/util/util.js', 166, 'checkMarketList(marketArr, properties) {'],
+        ].map(([file, line, anchor]) =>
+            Object.freeze({ file: String(file), line: Number(line), anchor: String(anchor) })
+        ),
+    ]),
+});
+
 export interface CommandCatalogEntry {
     readonly name: string;
     /** Exact first declaration string, including positional argument notation. */
@@ -97,7 +134,9 @@ export interface CommandCatalogEntry {
     readonly reviewedVersion: typeof REVIEWED_MCDEV_VERSION;
     readonly sourceReferences: readonly CommandSourceReference[];
     readonly reviewedEffects?:
-        typeof deltaEffects | (typeof BUILD_EFFECTS)[keyof typeof BUILD_EFFECTS];
+        | typeof deltaEffects
+        | typeof cloneEffects
+        | (typeof BUILD_EFFECTS)[keyof typeof BUILD_EFFECTS];
     readonly execution: {
         readonly status: 'guidance-only';
         readonly reason: string;
@@ -163,16 +202,24 @@ const catalog: readonly CommandCatalogEntry[] = Object.freeze(
                           reason: 'No execution adapter exists. Only partial createDeltaPkg effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
                       }),
                   }
-                : signature.split(' ')[0] in BUILD_EFFECTS
+                : signature === 'clone'
                   ? {
-                        reviewedEffects:
-                            BUILD_EFFECTS[signature.split(' ')[0] as keyof typeof BUILD_EFFECTS],
+                        reviewedEffects: cloneEffects,
                         execution: Object.freeze({
                             status: 'guidance-only' as const,
-                            reason: 'No execution adapter exists. Only partial build-family effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
+                            reason: 'No execution adapter exists. Only partial clone effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
                         }),
                     }
-                  : { execution }),
+                  : signature.split(' ')[0] in BUILD_EFFECTS
+                    ? {
+                          reviewedEffects:
+                              BUILD_EFFECTS[signature.split(' ')[0] as keyof typeof BUILD_EFFECTS],
+                          execution: Object.freeze({
+                              status: 'guidance-only' as const,
+                              reason: 'No execution adapter exists. Only partial build-family effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
+                          }),
+                      }
+                    : { execution }),
         })
     )
 );

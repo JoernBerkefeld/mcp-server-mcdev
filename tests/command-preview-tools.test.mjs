@@ -72,6 +72,7 @@ test('command catalog tools expose reviewed declarations only', { timeout: 30_00
                     assert.match(entry.execution.reason, /No execution adapter exists/u);
                     if (
                         [
+                            'clone',
                             'build',
                             'buildTemplate',
                             'buildDefinition',
