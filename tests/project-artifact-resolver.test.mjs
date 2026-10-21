@@ -150,6 +150,99 @@ test('email multiple verified extracts stay explicit and never choose one source
     assert.ok(handoff.findings.some((finding) => finding.code === 'unverified-source-identity'));
 });
 
+test('email semantic roles select original bytes without treating plain text as HTML', () => {
+    const project = fixture();
+    const asset = email(project);
+    const sources = new Map();
+    for (const role of ['html', 'preheader', 'text']) {
+        const sourcePath = asset.source(role);
+        const text = `\uFEFFsynthetic ${role} café 🌍\r\n終\n`;
+        const bytes = Buffer.from(text);
+        fs.writeFileSync(sourcePath, bytes);
+        sources.set(role, { sourcePath, text, bytes });
+    }
+    for (const [role, expected] of sources) {
+        const result = readProjectArtifactSource(project, emailSelector, {}, role);
+        assert.equal(result.status, 'resolved');
+        assert.equal(result.source.sourcePath, expected.sourcePath);
+        assert.equal(result.source.text, expected.text);
+        assert.equal(result.source.hash, createHash('sha256').update(expected.bytes).digest('hex'));
+        assert.equal(result.source.hashBasis, 'original-file-bytes');
+        assert.equal(result.source.language, role === 'html' ? 'html' : 'text');
+        assert.equal(result.source.rendering, 'not-performed');
+        assert.deepEqual(result.source.validation, {
+            status: 'not-performed',
+            requiredCapability:
+                role === 'html' ? 'validate_sfmc_html' : 'text-validator-not-established',
+        });
+    }
+    assert.equal(readProjectArtifactSource(project, emailSelector).source, undefined);
+    assert.equal(
+        readProjectArtifactSource(project, emailSelector, { maxEntries: 1 }, 'html').source,
+        undefined
+    );
+});
+
+test('email missing or invalid roles cannot authorize a source or caller path', () => {
+    const project = fixture();
+    const asset = email(project);
+    asset.source();
+    for (const role of [
+        'preheader',
+        'text',
+        '',
+        'source',
+        '../html',
+        'html/../../text',
+        'views.html.content.asset-email-meta.html',
+        asset.metadataPath,
+        null,
+        {},
+        ['html'],
+    ]) {
+        const result = readProjectArtifactSource(project, emailSelector, {}, role);
+        assert.equal(result.status, 'blocked');
+        assert.equal(result.source, undefined);
+    }
+    for (const type of ['query', 'script']) {
+        metadata(project, type);
+        companion(project, type, type === 'query' ? 'sql' : 'ssjs');
+        assert.equal(
+            readProjectArtifactSource(project, { ...selector, metadataType: type }, {}, 'html')
+                .source,
+            undefined
+        );
+    }
+    email(project, { nested: false });
+    assert.equal(readProjectArtifactSource(project, emailSelector, {}, 'html').status, 'ambiguous');
+    assert.equal(readProjectArtifactSource(project, emailSelector, {}, 'html').source, undefined);
+});
+
+test('selected email source retains bounded UTF-8 and link guards', () => {
+    for (const kind of ['oversized', 'utf8', 'hardlink', 'drift']) {
+        const project = fixture();
+        const asset = email(project);
+        asset.source();
+        const source = asset.source('text');
+        if (kind === 'oversized') fs.writeFileSync(source, Buffer.alloc(1024 * 1024 + 1));
+        if (kind === 'utf8') fs.writeFileSync(source, Buffer.from([195, 40]));
+        if (kind === 'hardlink') fs.linkSync(source, `${source}.alias`);
+        const original = fs.openSync;
+        fs.openSync = (candidate, ...args) => {
+            const descriptor = original(candidate, ...args);
+            if (kind === 'drift' && candidate === source) fs.appendFileSync(source, 'drift');
+            return descriptor;
+        };
+        try {
+            const result = readProjectArtifactSource(project, emailSelector, {}, 'text');
+            assert.equal(result.status, 'blocked', kind);
+            assert.equal(result.source, undefined, kind);
+        } finally {
+            fs.openSync = original;
+        }
+    }
+});
+
 test('email missing, mismatched, duplicate and unsupported layouts do not authorize edits', () => {
     for (const kind of [
         'missing',

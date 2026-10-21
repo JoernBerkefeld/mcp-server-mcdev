@@ -13,6 +13,9 @@ export interface ArtifactSelector {
     metadataType: string;
     externalKey: string;
 }
+/** Semantic email view, never a filename or path. */
+export type EmailSourceRole = 'html' | 'preheader' | 'text';
+
 export interface ArtifactResolution {
     status: 'resolved' | 'missing' | 'ambiguous' | 'unsupported' | 'blocked';
     metadataPaths: string[];
@@ -169,7 +172,7 @@ export interface ProjectArtifactSource {
         rootKind: ArtifactSelector['rootKind'];
         sourcePath: string;
         role: 'editable-source';
-        language: 'sql' | 'ssjs' | 'html' | 'ampscript';
+        language: 'sql' | 'ssjs' | 'html' | 'ampscript' | 'text';
         text: string;
         hash: string;
         hashAlgorithm: 'sha256';
@@ -179,6 +182,7 @@ export interface ProjectArtifactSource {
             status: 'not-performed';
             requiredCapability:
                 | 'sql-validator-not-established'
+                | 'text-validator-not-established'
                 | 'validate_ssjs'
                 | 'validate_sfmc_html'
                 | 'validate_ampscript';
@@ -194,25 +198,46 @@ export interface ProjectArtifactSource {
  * @param project - Unmodified configuration from readProjectConfig.
  * @param selector - Explicit qualified identity, never a caller-supplied file path.
  * @param limits - Optional lower inventory traversal bounds.
+ * @param sourceRole - Optional semantic email view; never a caller path or filename.
  * @returns {ProjectArtifactSource} Complete UTF-8 source and byte hash, or no source on failure.
  */
 export function readProjectArtifactSource(
     project: ProjectConfig,
     selector: ArtifactSelector,
-    limits: Partial<ArtifactLimits> = {}
+    limits: Partial<ArtifactLimits> = {},
+    sourceRole?: EmailSourceRole
 ): ProjectArtifactSource {
+    if (
+        sourceRole !== undefined &&
+        (selector.metadataType !== 'asset-email' ||
+            !['html', 'preheader', 'text'].includes(sourceRole))
+    )
+        return { status: 'blocked', findings: [{ code: 'unsupported-source-role' }] };
     const resolution = resolveProjectArtifact(project, selector, limits);
     const result: ProjectArtifactSource = {
         status: resolution.status,
         findings: [...resolution.findings],
     };
     if (resolution.status !== 'resolved') return result;
-    if (resolution.metadataPaths.length !== 1 || resolution.editableCompanions.length !== 1) {
+    const companions =
+        sourceRole === undefined
+            ? resolution.editableCompanions
+            : resolution.editableCompanions.filter(
+                  (source) =>
+                      path.basename(source.absolutePath) ===
+                      `views.${sourceRole}.content.asset-email-meta.${sourceRole === 'html' ? 'html' : 'amp'}`
+              );
+    if (resolution.metadataPaths.length !== 1 || companions.length !== 1) {
         result.status = 'blocked';
         result.findings.push({ code: 'unverified-source-identity' });
         return result;
     }
-    const companion = resolution.editableCompanions[0];
+    const companion = companions[0];
+    // Email .amp is a native storage suffix, not proof of an AMPscript-only document.
+    const language =
+        selector.metadataType === 'asset-email' && companion.language === 'ampscript'
+            ? 'text'
+            : companion.language;
     try {
         const bytes = readSelectedBytes(project.projectRoot, companion.absolutePath);
         // Preserve a UTF-8 BOM in text; hash the original bytes, not re-encoded text.
@@ -229,7 +254,7 @@ export function readProjectArtifactSource(
             rootKind: selector.rootKind,
             sourcePath: companion.absolutePath,
             role: 'editable-source',
-            language: companion.language,
+            language,
             text,
             hash: createHash('sha256').update(bytes).digest('hex'),
             hashAlgorithm: 'sha256',
@@ -238,19 +263,21 @@ export function readProjectArtifactSource(
             validation: {
                 status: 'not-performed',
                 requiredCapability:
-                    companion.language === 'sql'
+                    language === 'sql'
                         ? 'sql-validator-not-established'
-                        : companion.language === 'ssjs'
-                          ? 'validate_ssjs'
-                          : companion.language === 'ampscript'
-                            ? 'validate_ampscript'
-                            : 'validate_sfmc_html',
+                        : language === 'text'
+                          ? 'text-validator-not-established'
+                          : language === 'ssjs'
+                            ? 'validate_ssjs'
+                            : language === 'ampscript'
+                              ? 'validate_ampscript'
+                              : 'validate_sfmc_html',
             },
             executionReadiness: 'unknown',
             limitations: [
                 'Editable-source role is not evidence of historical generation or provenance.',
                 'No rendering, validation, filesystem mutation or live execution was performed.',
-                'The host must discover companion capabilities and coordinate platform detection, lookups and full-document validation; SQL validation is not established.',
+                'The host must discover companion capabilities and coordinate platform detection, lookups and full-document validation; SQL and plain-text validation are not established.',
                 'Bounded checks reject detectable drift but are not atomic or a concurrent-mutation sandbox; callers must prevent concurrent filesystem mutation.',
             ],
         };
