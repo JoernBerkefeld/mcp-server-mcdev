@@ -70,7 +70,13 @@ test('command catalog tools expose reviewed declarations only', { timeout: 30_00
                 for (const entry of entries) {
                     assert.equal(entry.execution.status, 'guidance-only');
                     assert.match(entry.execution.reason, /No execution adapter exists/u);
-                    assert.match(entry.execution.reason, /have not been reviewed/u);
+                    if (entry.name === 'createDeltaPkg') {
+                        assert.equal(entry.reviewedEffects.status, 'partial-source-review');
+                        assert.match(entry.execution.reason, /remain unverified/u);
+                    } else {
+                        assert.match(entry.execution.reason, /have not been reviewed/u);
+                        assert.equal(entry.reviewedEffects, undefined);
+                    }
                     assert.equal(entry.approved, undefined);
                     assert.equal(entry.argv, undefined);
                     assert.equal(entry.executable, undefined);

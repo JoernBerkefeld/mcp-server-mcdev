@@ -92,10 +92,16 @@ test('every canonical name and alias resolves uniquely to an immutable guidance-
     assert.ok(Object.isFrozen(listCommands()));
     for (const command of listCommands()) {
         assert.equal(command.reviewedVersion, REVIEWED_MCDEV_VERSION);
-        assert.deepEqual(command.execution, {
-            status: 'guidance-only',
-            reason: 'Declaration inventory only. No execution adapter exists; effects, prerequisites, and interactive prompts have not been reviewed.',
-        });
+        assert.equal(command.execution.status, 'guidance-only');
+        if (command.name === 'createDeltaPkg') {
+            assert.match(command.execution.reason, /Only partial createDeltaPkg effects/u);
+        } else {
+            assert.deepEqual(command.execution, {
+                status: 'guidance-only',
+                reason: 'Declaration inventory only. No execution adapter exists; effects, prerequisites, and interactive prompts have not been reviewed.',
+            });
+            assert.equal(command.reviewedEffects, undefined);
+        }
         assert.equal(command.sourceReferences[0].file, COMMAND_CATALOG_SOURCE);
         assert.equal(command.sourceReferences[0].package, 'mcdev');
         for (const name of [command.name, ...command.aliases]) {
