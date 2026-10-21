@@ -152,6 +152,13 @@ test(
                     'lookup',
                     'validate_ssjs',
                     'validate_sfmc_html',
+                    'validate_ampscript',
+                    'asset-email',
+                    'htmlemail/templatebasedemail',
+                    'customerKey',
+                    'exactly one editable companion',
+                    'multiple extracts are blocked with no source and no guessed choice',
+                    'Dependencies are not confirmed',
                     'SQL validation is not established',
                     'concurrent filesystem mutation',
                     'Do not claim companion tools were performed',
@@ -213,6 +220,84 @@ test(
                         requiredCapability: 'sql-validator-not-established',
                     });
                     assert.equal(sql.source.executionReadiness, 'unknown');
+                }
+            );
+            await t.test(
+                'email single-source handoff is exact and multiple extracts never guess',
+                async () => {
+                    for (const subtype of ['htmlemail', 'templatebasedemail']) {
+                        const emailRoot = fixture();
+                        const directory = path.join(
+                            emailRoot,
+                            'retrieve',
+                            'example',
+                            'sample',
+                            'asset',
+                            'email',
+                            'email-key'
+                        );
+                        fs.mkdirSync(directory, { recursive: true });
+                        const metadataPath = path.join(
+                            directory,
+                            'email-key.asset-email-meta.json'
+                        );
+                        const metadata = {
+                            customerKey: 'email-key',
+                            assetType: { name: subtype },
+                            views: { html: {}, preheader: {}, text: {} },
+                        };
+                        fs.writeFileSync(metadataPath, JSON.stringify(metadata));
+                        const sourcePath = path.join(
+                            directory,
+                            'views.html.content.asset-email-meta.html'
+                        );
+                        const emailText = '<p>synthetic email source</p>\n';
+                        fs.writeFileSync(sourcePath, emailText);
+                        const identity = {
+                            ...selector,
+                            metadataType: 'asset-email',
+                            externalKey: 'email-key',
+                        };
+                        const result = await read({ workspaceRoot: emailRoot, ...identity });
+                        assert.equal(result.status, 'resolved');
+                        assert.deepEqual(result.source.identity, identity);
+                        assert.equal(result.source.sourcePath, sourcePath);
+                        assert.equal(result.source.language, 'html');
+                        assert.equal(result.source.text, emailText);
+                        assert.equal(
+                            result.source.hash,
+                            createHash('sha256').update(Buffer.from(emailText)).digest('hex')
+                        );
+                        assert.deepEqual(result.source.validation, {
+                            status: 'not-performed',
+                            requiredCapability: 'validate_sfmc_html',
+                        });
+                        assert.equal(result.source.executionReadiness, 'unknown');
+                        for (const view of ['preheader', 'text']) {
+                            fs.writeFileSync(
+                                path.join(directory, `views.${view}.content.asset-email-meta.amp`),
+                                privateMarker
+                            );
+                            const multiple = await read({ workspaceRoot: emailRoot, ...identity });
+                            assert.equal(multiple.status, 'blocked');
+                            assert.equal(Object.hasOwn(multiple, 'source'), false);
+                            assert.ok(
+                                multiple.findings.some(
+                                    (finding) => finding.code === 'unverified-source-identity'
+                                )
+                            );
+                        }
+                        metadata.views.html.slots = {};
+                        fs.writeFileSync(metadataPath, JSON.stringify(metadata));
+                        const unsupported = await read({ workspaceRoot: emailRoot, ...identity });
+                        assert.equal(unsupported.status, 'ambiguous');
+                        assert.equal(Object.hasOwn(unsupported, 'source'), false);
+                        assert.ok(
+                            unsupported.findings.some(
+                                (finding) => finding.code === 'unsupported-email-layout'
+                            )
+                        );
+                    }
                 }
             );
             await t.test(

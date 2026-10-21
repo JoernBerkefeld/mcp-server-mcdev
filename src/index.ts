@@ -451,13 +451,17 @@ server.tool(
 
 server.tool(
     'resolve_mcdev_project_artifact',
-    'Read-only qualified local resolution for query/script only; other metadata types are unsupported. Returns paths, not arbitrary file contents, and does not confirm dependencies. Blocked/ambiguous results offer no editable companions. Never reads auth contents or logs. No guarantee of remote freshness or an atomic filesystem sandbox; prevent concurrent filesystem mutation.',
+    'Read-only qualified local resolution for query, script and bounded asset-email layouts (htmlemail/templatebasedemail matched by customerKey, with exact HTML/preheader/text extract companions); other types and layouts are unsupported. Returns paths, not arbitrary file contents, and does not confirm dependencies. Blocked/ambiguous results offer no editable companions. Never reads auth contents or logs. No guarantee of remote freshness or an atomic filesystem sandbox; prevent concurrent filesystem mutation.',
     {
         ...artifactToolSchema,
         rootKind: z.enum(['retrieve', 'deploy']),
         credential: z.string(),
         businessUnit: z.string(),
-        metadataType: z.string().describe('query or script; other types return unsupported.'),
+        metadataType: z
+            .string()
+            .describe(
+                'query, script or asset-email (bounded htmlemail/templatebasedemail layouts only).'
+            ),
         externalKey: z.string(),
     },
     ({ workspaceRoot, maxEntries, maxDepth, ...selector }) => {
@@ -479,13 +483,17 @@ server.tool(
 
 server.tool(
     'read_mcdev_artifact_source',
-    'Read-only full-text editable-source handoff for one qualified query/script identity, never a caller-supplied file path. Returns complete original UTF-8 text (including BOM) and SHA-256 of original file bytes without truncation; unresolved or blocked results never contain source. No rendering, validation, mutation, native modules or live execution is performed; execution readiness is unknown. The host must discover companion capabilities and coordinate platform detection, identifier lookup and full-document validate_ssjs or validate_sfmc_html as appropriate; SQL validation is not established. Do not claim companion tools were performed. Prevent concurrent filesystem mutation: bounded checks are not atomic or a concurrent-mutation sandbox. Never reads auth contents or logs.',
+    'Read-only full-text editable-source handoff for one qualified query, script or bounded asset-email identity (htmlemail/templatebasedemail matched by customerKey with exact HTML/preheader/text extracts), never a caller-supplied file path. Requires exactly one editable companion; multiple extracts are blocked with no source and no guessed choice. Dependencies are not confirmed. Returns complete original UTF-8 text (including BOM) and SHA-256 of original file bytes without truncation; unresolved or blocked results never contain source. No rendering, validation, mutation, native modules or live execution is performed; execution readiness is unknown. The host must discover companion capabilities and coordinate platform detection, identifier lookup and full-document validate_ssjs, validate_sfmc_html or validate_ampscript as appropriate; SQL validation is not established. Do not claim companion tools were performed. Prevent concurrent filesystem mutation: bounded checks are not atomic or a concurrent-mutation sandbox. Never reads auth contents or logs.',
     {
         ...artifactToolSchema,
         rootKind: z.enum(['retrieve', 'deploy']),
         credential: z.string(),
         businessUnit: z.string(),
-        metadataType: z.string().describe('query or script; other types return unsupported.'),
+        metadataType: z
+            .string()
+            .describe(
+                'query, script or asset-email (bounded htmlemail/templatebasedemail layouts only).'
+            ),
         externalKey: z.string(),
     },
     ({ workspaceRoot, maxEntries, maxDepth, ...selector }) => {

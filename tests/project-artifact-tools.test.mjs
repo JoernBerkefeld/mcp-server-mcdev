@@ -99,6 +99,25 @@ test(
                     const resolver = tools.find(
                         (entry) => entry.name === 'resolve_mcdev_project_artifact'
                     );
+                    assert.match(
+                        resolver.description,
+                        /asset-email.*htmlemail\/templatebasedemail/u
+                    );
+                    assert.match(resolver.description, /customerKey.*HTML\/preheader\/text/u);
+                    assert.match(resolver.description, /does not confirm dependencies/u);
+                    assert.deepEqual(
+                        Object.keys(resolver.inputSchema.properties).toSorted(),
+                        [
+                            'workspaceRoot',
+                            'rootKind',
+                            'credential',
+                            'businessUnit',
+                            'metadataType',
+                            'externalKey',
+                            'maxEntries',
+                            'maxDepth',
+                        ].toSorted()
+                    );
                     assert.deepEqual(resolver.inputSchema.properties.rootKind.enum, [
                         'retrieve',
                         'deploy',
@@ -140,6 +159,95 @@ test(
                     }
                 }
             );
+            await t.test('email identities resolve only exact qualified extracts', async () => {
+                const emailRoot = fixture();
+                for (const [rootKind, subtype] of [
+                    ['retrieve', 'htmlemail'],
+                    ['deploy', 'templatebasedemail'],
+                ]) {
+                    const directory = path.join(
+                        emailRoot,
+                        rootKind,
+                        'example',
+                        'sample',
+                        'asset',
+                        'email'
+                    );
+                    const sources = path.join(directory, 'email-key');
+                    fs.mkdirSync(sources, { recursive: true });
+                    const metadataPath = path.join(directory, 'email-key.asset-email-meta.json');
+                    fs.writeFileSync(
+                        metadataPath,
+                        JSON.stringify({
+                            key: 'not-the-customer-key',
+                            customerKey: 'email-key',
+                            assetType: { name: subtype },
+                            views: { html: {}, preheader: {}, text: {} },
+                        })
+                    );
+                    const expected = [
+                        ['html', 'html', 'html'],
+                        ['preheader', 'amp', 'ampscript'],
+                        ['text', 'amp', 'ampscript'],
+                    ].map(([view, extension, language]) => {
+                        const absolutePath = path.join(
+                            sources,
+                            `views.${view}.content.asset-email-meta.${extension}`
+                        );
+                        fs.writeFileSync(absolutePath, sentinel);
+                        return { absolutePath, language, role: 'source' };
+                    });
+                    const identity = {
+                        workspaceRoot: emailRoot,
+                        rootKind,
+                        metadataType: 'asset-email',
+                        externalKey: 'email-key',
+                    };
+                    const result = await resolve(identity);
+                    assert.equal(result.status, 'resolved');
+                    assert.deepEqual(result.metadataPaths, [metadataPath]);
+                    assert.deepEqual(result.editableCompanions, expected);
+                    assert.equal(result.dependencyResolution, 'not-evaluated');
+                    assert.deepEqual(result.locallyConfirmedDependencies, []);
+                    assert.deepEqual(result.declaredDependencies, [
+                        'folder-asset',
+                        'folder-asset-shared',
+                        'folder-cloudpages',
+                    ]);
+                    assert.equal(
+                        (await resolve({ ...identity, businessUnit: 'other' })).status,
+                        'missing'
+                    );
+                    assert.equal(
+                        (await resolve({ ...identity, externalKey: 'not-the-customer-key' }))
+                            .status,
+                        'missing'
+                    );
+                    for (const metadata of [
+                        {
+                            customerKey: 'email-key',
+                            assetType: { name: 'webpage' },
+                            views: { html: {} },
+                        },
+                        {
+                            customerKey: 'email-key',
+                            assetType: { name: subtype },
+                            views: { html: { slots: {} } },
+                        },
+                        {
+                            customerKey: 'email-key',
+                            assetType: { name: subtype },
+                            views: { html: { content: sentinel }, preheader: {}, text: {} },
+                        },
+                    ]) {
+                        fs.writeFileSync(metadataPath, JSON.stringify(metadata));
+                        const unsupported = await resolve(identity);
+                        assert.equal(unsupported.status, 'ambiguous');
+                        assert.deepEqual(unsupported.editableCompanions, []);
+                        assert.ok(unsupported.findings.length > 0);
+                    }
+                }
+            });
             await t.test(
                 'missing, unsupported and incomplete results never offer editable paths',
                 async () => {
