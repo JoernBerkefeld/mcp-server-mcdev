@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { test } from 'node:test';
 import {
     createQueryRetrieveConfirmation,
+    createQueryRetrieveApproval,
     createQueryRetrieveSdkElicitor,
     createSyntheticQueryConfirmation,
 } from '../dist/query-retrieve-confirmation.js';
@@ -87,6 +88,27 @@ for (const field of ['config', 'artifacts', 'selectors', 'effects', 'reviewedVer
         assert.equal(calls.length, 0);
     });
 }
+
+test('internal approval-only path settles without ever invoking supplied execution', async () => {
+    let executions = 0;
+    const gate = createQueryRetrieveApproval(
+        { ...input(), effects: ['Exact prepared effects'] },
+        {
+            signal: new AbortController().signal,
+            elicit: accept,
+            recheck: async (operation) => ({ snapshot: operation.snapshot, ready: true }),
+            execute: async () => {
+                executions++;
+                throw new Error('must never execute');
+            },
+        }
+    );
+    assert.equal(gate.operation.mode, 'approval-only');
+    assert.deepEqual(gate.operation.effects, ['Exact prepared effects']);
+    assert.equal((await gate.confirm()).outcome, 'accepted');
+    assert.equal((await gate.confirm()).outcome, 'invalid');
+    assert.equal(executions, 0);
+});
 
 test('actual blocked contract cannot be overridden by positive readiness', async () => {
     const { gate, calls } = harness({}, true);

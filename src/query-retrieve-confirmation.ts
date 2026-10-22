@@ -25,7 +25,7 @@ export interface QueryDescriptor extends Readonly<QueryInput> {
     readonly type: 'query';
     readonly reviewedVersion: '10.1.0';
     readonly effects: readonly string[];
-    readonly mode: 'blocked-contract' | 'synthetic-only';
+    readonly mode: 'blocked-contract' | 'synthetic-only' | 'approval-only';
 }
 interface Dependencies {
     elicit: (
@@ -121,9 +121,15 @@ const result = (outcome: Outcome) =>
  * @param input - Exact inspected mapping and opaque reviewed snapshot identity.
  * @param dependencies - Request-owned host, reinspection and fake callback seams.
  * @param synthetic - Explicit test harness only; never native execution authorization.
+ * @param approvalEffects - Prepared effects for the internal non-executing approval path.
  * @returns {object} Single-use confirmation gate with an immutable operation descriptor.
  */
-function createGate(input: QueryInput, dependencies: Dependencies, synthetic: boolean) {
+function createGate(
+    input: QueryInput,
+    dependencies: Dependencies,
+    synthetic: boolean,
+    approvalEffects?: readonly string[]
+) {
     const { projectRoot, credential, businessUnit, mid, key, snapshot } = input;
     const literal = /^[A-Za-z0-9][A-Za-z0-9_. -]*$/u;
     if (
@@ -157,13 +163,17 @@ function createGate(input: QueryInput, dependencies: Dependencies, synthetic: bo
         command: 'retrieve',
         type: 'query',
         reviewedVersion: QUERY_RETRIEVE_CONTRACT.reviewedVersion,
-        mode: synthetic ? 'synthetic-only' : 'blocked-contract',
-        effects: Object.freeze([
-            ...QUERY_RETRIEVE_CONTRACT.localEffects,
-            ...QUERY_RETRIEVE_CONTRACT.remoteEffects,
-            ...QUERY_RETRIEVE_CONTRACT.dynamicBoundaries,
-            'Native deletions require operation authorization; no personal policy exception is portable.',
-        ]),
+        mode: approvalEffects ? 'approval-only' : synthetic ? 'synthetic-only' : 'blocked-contract',
+        effects: Object.freeze(
+            approvalEffects
+                ? [...approvalEffects]
+                : [
+                      ...QUERY_RETRIEVE_CONTRACT.localEffects,
+                      ...QUERY_RETRIEVE_CONTRACT.remoteEffects,
+                      ...QUERY_RETRIEVE_CONTRACT.dynamicBoundaries,
+                      'Native deletions require operation authorization; no personal policy exception is portable.',
+                  ]
+        ),
     });
     // Capture dependencies so later caller mutation cannot replace the callback or request lifetime.
     const { elicit, recheck, execute, signal } = dependencies;
@@ -225,6 +235,7 @@ function createGate(input: QueryInput, dependencies: Dependencies, synthetic: bo
                     if (checked.snapshot !== operation.snapshot || checked.ready !== true)
                         return 'blocked';
                     // Even a positive recheck cannot override the actual immutable blocked contract.
+                    if (approvalEffects) return 'accepted';
                     if (!synthetic && !QUERY_RETRIEVE_CONTRACT.executionEnabled) return 'blocked';
                     await execute(operation);
                     return expired() ?? 'accepted';
@@ -240,6 +251,20 @@ function createGate(input: QueryInput, dependencies: Dependencies, synthetic: bo
             }
         },
     });
+}
+
+/**
+ * Create an internal approval-only gate. No execution callback is accepted or invoked.
+ * The coordinator must await settlement and recheck before any process launch.
+ * @param input - Prepared exact operation and disclosed effects.
+ * @param dependencies - Request-bound elicitation and read-only recheck.
+ * @returns {object} Single-use approval evidence, never execution itself.
+ */
+export function createQueryRetrieveApproval(
+    input: QueryInput & { readonly effects: readonly string[] },
+    dependencies: Omit<Dependencies, 'execute'>
+) {
+    return createGate(input, { ...dependencies, execute: async () => {} }, false, input.effects);
 }
 
 /**
