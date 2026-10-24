@@ -113,13 +113,95 @@ test('builder recommendation is first step, excludes auth and never gates diagno
     assert.ok(result.limitations.some((value) => value.includes('targetBranchBuMapping')));
 });
 
-test('unsupported market composition is explicitly unvalidated rather than rejected', () => {
+test('mixed composed references retain flat findings and index missing nested members exactly', () => {
     const config = valid();
-    config.marketList.target['second/shared'] = [['empty', 'other']];
-    assert.ok(
-        diagnose(config).findings.some(
-            (finding) =>
-                finding.code === 'unsupported-market-shape' && finding.severity === 'warning'
-        )
+    config.marketList.target['second/shared'] = [
+        'flat-missing',
+        ['empty', 'nested-missing', 'other', 'nested-missing'],
+        'other',
+    ];
+    config.marketList.target['first/shared'] = [['other', 'empty']];
+    const findings = diagnose(config).findings;
+    assert.deepEqual(
+        findings.map(({ code, severity, path, message }) => ({ code, severity, path, message })),
+        [
+            ['$.marketList["target"]["second/shared"]', 'flat-missing'],
+            ['$.marketList["target"]["second/shared"][1][1]', 'nested-missing'],
+            ['$.marketList["target"]["second/shared"][1][3]', 'nested-missing'],
+        ].map(([path, reference]) => ({
+            code: 'unresolved-market',
+            severity: 'warning',
+            path,
+            message: `Market ${JSON.stringify(reference)} is not defined.`,
+        }))
     );
+});
+
+test('string and flat-array missing references keep their existing unindexed findings', () => {
+    for (const reference of ['missing', ['empty', 'missing']]) {
+        const config = valid();
+        config.marketList.target['second/shared'] = reference;
+        assert.deepEqual(diagnose(config).findings, [
+            {
+                code: 'unresolved-market',
+                severity: 'warning',
+                path: '$.marketList["target"]["second/shared"]',
+                message: 'Market "missing" is not defined.',
+                evidence: 'mcdev/lib/util/util.js: verifyMarketList, isValidBU',
+            },
+        ]);
+    }
+});
+
+test('malformed and deeper members warn at exact indices without skipping valid siblings', () => {
+    const config = valid();
+    config.marketList.target['second/shared'] = [
+        null,
+        7,
+        { custom: true },
+        [false, ['empty', 'hidden-missing'], 'visible-missing'],
+    ];
+    config.marketList.target['first/shared'] = false;
+    const findings = diagnose(config).findings;
+    assert.deepEqual(
+        findings
+            .filter((finding) => finding.code === 'unsupported-market-shape')
+            .map((finding) => finding.path),
+        [
+            '$.marketList["target"]["second/shared"][0]',
+            '$.marketList["target"]["second/shared"][1]',
+            '$.marketList["target"]["second/shared"][2]',
+            '$.marketList["target"]["second/shared"][3][0]',
+            '$.marketList["target"]["second/shared"][3][1]',
+            '$.marketList["target"]["first/shared"]',
+        ]
+    );
+    assert.ok(findings.every((finding) => finding.severity === 'warning'));
+    assert.deepEqual(
+        findings
+            .filter((finding) => finding.code === 'unresolved-market')
+            .map((finding) => finding.path),
+        ['$.marketList["target"]["second/shared"][3][2]']
+    );
+    assert.ok(!JSON.stringify(findings).includes('hidden-missing'));
+});
+
+test('empty and valid compositions remain partial static inspection, not native certification', () => {
+    for (const references of [[], [[]], [['empty', 'other']], ['empty', [], ['other']]]) {
+        const config = valid();
+        config.marketList.target['second/shared'] = references;
+        const result = diagnose(config);
+        assert.deepEqual(result.findings, []);
+        assert.ok(result.limitations.some((text) => /Empty arrays.*not proof/u.test(text)));
+        assert.ok(
+            result.limitations.some((text) => /buildDefinitionBulk.*verifyMarketList/u.test(text))
+        );
+        assert.ok(
+            result.limitations.some((text) =>
+                /acceptance, rendering, overlay precedence and native command success remain unverified/u.test(
+                    text
+                )
+            )
+        );
+    }
 });

@@ -173,6 +173,51 @@ test('proposed diagnosis retains builder-first recommendation and partial limita
     assert.ok(result.limitations.some((text) => text.includes('no redaction')));
 });
 
+test('composed-reference preview diagnoses proposed raw text and budgets the entire result', () => {
+    const config = {
+        credentials: { synthetic: { businessUnits: { unit: '123' } } },
+        markets: { base: {}, currentOnly: {} },
+        marketList: { target: { 'synthetic/unit': [['base', 'currentOnly']] } },
+        custom: { untouched: ['retain', { value: true }] },
+    };
+    const rawText = ` ${JSON.stringify(config)}\n`;
+    const current = project(rawText);
+    // The parsed wrapper must not override either authoritative raw snapshot.
+    current.config = { ignored: true };
+    const before = structuredClone(current);
+    const proposed = structuredClone(config);
+    proposed.marketList.target['synthetic/unit'] = [['base', 'proposed-missing'], [], [null]];
+    const text = `${JSON.stringify(proposed, null, 2)}\n`;
+    const result = previewProjectConfig(current, text);
+    assert.deepEqual(result.diagnosis, diagnoseProjectConfig(project(text)));
+    assert.deepEqual(
+        result.diagnosis.findings.map(({ code, path }) => ({ code, path })),
+        [
+            { code: 'unresolved-market', path: '$.marketList["target"]["synthetic/unit"][0][1]' },
+            {
+                code: 'unsupported-market-shape',
+                path: '$.marketList["target"]["synthetic/unit"][2][0]',
+            },
+        ]
+    );
+    assert.deepEqual(result.changes, [
+        {
+            op: 'replace',
+            path: '/marketList/target/synthetic~1unit',
+            before: [['base', 'currentOnly']],
+            after: [['base', 'proposed-missing'], [], [null]],
+        },
+    ]);
+    assert.equal(result.current.sha256, digest(rawText));
+    assert.equal(result.proposed.sha256, digest(text));
+    assert.match(result.diagnosis.recommendation.firstStep, /Before editing.*Pipeline Builder/u);
+    assert.deepEqual(current, before);
+    assert.deepEqual(proposed.custom, config.custom);
+    const bytes = Buffer.byteLength(JSON.stringify(result));
+    assert.deepEqual(previewProjectConfig(current, text, bytes), result);
+    rejects(current, text, 'output-budget', bytes - 1);
+});
+
 test('core imports only hashing and pure diagnosis, not inspection runtime or write tools', () => {
     const source = fs.readFileSync(
         new URL('../src/project-config-preview.ts', import.meta.url),

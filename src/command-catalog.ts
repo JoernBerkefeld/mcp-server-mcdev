@@ -4,6 +4,91 @@ import { BUILD_EFFECTS } from './build-effects.js';
 export const REVIEWED_MCDEV_VERSION = '10.1.0' as const;
 export const COMMAND_CATALOG_SOURCE = 'mcdev/lib/cli.js' as const;
 
+/** Static host routing guidance, not executable tools or connected-server availability. */
+export interface CapabilityRoute {
+    readonly intent:
+        | 'query-metadata-retrieve'
+        | 'script-metadata-retrieve'
+        | 'metadata-source-change'
+        | 'language-validation'
+        | 'sql-text-validation'
+        | 'data-extension-rows'
+        | 'transactional-definition'
+        | 'message-send';
+    readonly backend: 'mcdev' | 'sfmc-language' | 'vendor-mce' | 'manual';
+    readonly requiredCapability: string;
+    readonly standaloneFallback: string;
+}
+
+export const CAPABILITY_ROUTES: readonly CapabilityRoute[] = Object.freeze(
+    [
+        {
+            intent: 'query-metadata-retrieve',
+            backend: 'mcdev',
+            requiredCapability:
+                'retrieve_mcdev_query: exact-key query metadata retrieval under the existing Windows/mcdev 10.1.0 restrictions; never SQL execution.',
+            standaloneFallback:
+                'Use the existing restricted native tool when its prerequisites hold; otherwise provide documentation and guidance only, with retrieval unperformed. No broad fallback.',
+        },
+        {
+            intent: 'script-metadata-retrieve',
+            backend: 'mcdev',
+            requiredCapability:
+                'retrieve_mcdev_script: exact-key Script Activity metadata retrieval under the existing Windows/mcdev 10.1.0 restrictions; never SSJS or automation execution.',
+            standaloneFallback:
+                'Use the existing restricted native tool when its prerequisites hold; otherwise provide documentation and guidance only, with retrieval unperformed. No broad fallback.',
+        },
+        {
+            intent: 'metadata-source-change',
+            backend: 'mcdev',
+            requiredCapability:
+                'Qualified local metadata and editable-source inspection, followed by mcdev build/deploy guidance. Prefer local-source changes when both routes satisfy the task; build/deploy remain guidance-only.',
+            standaloneFallback:
+                'Inspect supported local artifacts and provide documentation and non-executing previews; report missing language checks and unperformed build/deploy. No synchronization claim.',
+        },
+        {
+            intent: 'language-validation',
+            backend: 'sfmc-language',
+            requiredCapability:
+                'Host-discovered platform detection, identifier lookups and full-document language validation for the established source kind, respecting caveats and required polyfills.',
+            standaloneFallback:
+                'Retain native metadata and documentation capabilities, but mark companion lookups/validation unperformed; stop only work that requires the missing language capability.',
+        },
+        {
+            intent: 'sql-text-validation',
+            backend: 'vendor-mce',
+            requiredCapability:
+                'Optional host-discovered SQL-text validation with its actual schema and verified matching account/BU; a capability candidate, not an established check or SQL execution.',
+            standaloneFallback:
+                'Provide query metadata/source inspection and documentation only; SQL validation remains unperformed and SQL execution is not supported.',
+        },
+        {
+            intent: 'data-extension-rows',
+            backend: 'vendor-mce',
+            requiredCapability:
+                'Host-discovered row-data operation matching the requested read or write and verified account/BU; DE schema metadata retrieval is not row access.',
+            standaloneFallback:
+                'Explain the row-operation limitation; mcdev metadata retrieval cannot substitute for row access. No row read or write is performed.',
+        },
+        {
+            intent: 'transactional-definition',
+            backend: 'vendor-mce',
+            requiredCapability:
+                'Host-discovered transactional-definition management for the requested operation and verified account/BU; creating or updating a definition is not sending a message.',
+            standaloneFallback:
+                'Provide documentation only and mark definition management unperformed; never substitute an actual send or claim local synchronization.',
+        },
+        {
+            intent: 'message-send',
+            backend: 'manual',
+            requiredCapability:
+                'Manual/unsupported unless the host independently discovers a suitable actual-send capability, verifies account/BU and establishes operation-specific authorization; definition management does not establish send support.',
+            standaloneFallback:
+                'Explain that actual sending is unsupported here and leave it unperformed; no metadata, validation or diagnostic request authorizes a send.',
+        },
+    ].map((route) => Object.freeze(route as CapabilityRoute))
+);
+
 export interface CommandSourceReference {
     readonly package: 'mcdev';
     readonly file: typeof COMMAND_CATALOG_SOURCE;
@@ -138,14 +223,33 @@ export interface CommandCatalogEntry {
         | typeof cloneEffects
         | (typeof BUILD_EFFECTS)[keyof typeof BUILD_EFFECTS];
     readonly execution: {
-        readonly status: 'guidance-only';
+        readonly status: 'guidance-only' | 'partially-executable';
         readonly reason: string;
+        readonly supportedCases?: readonly {
+            readonly metadataType: 'query' | 'script';
+            readonly tool: 'retrieve_mcdev_query' | 'retrieve_mcdev_script';
+        }[];
+        readonly restrictions?: string;
+        readonly remainingGuidanceOnlyScope?: string;
     };
 }
 
 const execution = Object.freeze({
     status: 'guidance-only' as const,
     reason: 'Declaration inventory only. No execution adapter exists; effects, prerequisites, and interactive prompts have not been reviewed.',
+});
+
+const retrieveExecution = Object.freeze({
+    status: 'partially-executable' as const,
+    reason: 'Only exact-key query and script metadata retrieval have reviewed execution adapters; the full native retrieve signature is not executable through this catalog.',
+    supportedCases: Object.freeze([
+        Object.freeze({ metadataType: 'query' as const, tool: 'retrieve_mcdev_query' as const }),
+        Object.freeze({ metadataType: 'script' as const, tool: 'retrieve_mcdev_script' as const }),
+    ]),
+    restrictions:
+        'Windows and installed mcdev 10.1.0 only. Each tool accepts exactly workspaceRoot, credential, businessUnit and key: a canonical absolute project root, exact credential-qualified BU and one literal external key. Fresh preparation, reviewed configuration/runtime restrictions and caller-managed project/path quiescence are required; no arbitrary type, argv, flags or broad selectors.',
+    remainingGuidanceOnlyScope:
+        'All other metadata types and retrieve selectors/options, including whole-type, whole-BU, wildcard, name/ID and fallback retrieval, remain guidance-only. Catalog listing/lookup never launches a process, authorizes execution or supplies an argv allowlist.',
 });
 
 // These are declarations, not executable command lines or an argv allowlist.
@@ -219,7 +323,11 @@ const catalog: readonly CommandCatalogEntry[] = Object.freeze(
                               reason: 'No execution adapter exists. Only partial build-family effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
                           }),
                       }
-                    : { execution }),
+                    : {
+                          execution: signature.startsWith('retrieve ')
+                              ? retrieveExecution
+                              : execution,
+                      }),
         })
     )
 );

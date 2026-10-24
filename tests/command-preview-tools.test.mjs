@@ -60,16 +60,37 @@ test('command catalog tools expose reviewed declarations only', { timeout: 30_00
             assert.ok(tools.some((tool) => tool.name === 'inspect_mcdev_project'));
         });
         await t.test(
-            'list preserves the exact immutable module inventory and guidance status',
+            'list preserves the exact inventory and bounded retrieve execution coverage',
             async () => {
                 const response = await invoke('mcdev_list_commands');
                 assert.notEqual(response.isError, true);
                 const entries = JSON.parse(response.content[0].text);
                 assert.deepEqual(entries, listCommands());
                 assert.equal(entries.length, 31);
+                const { tools } = await client.listTools();
                 for (const entry of entries) {
-                    assert.equal(entry.execution.status, 'guidance-only');
-                    assert.match(entry.execution.reason, /No execution adapter exists/u);
+                    if (entry.name === 'retrieve') {
+                        assert.equal(entry.execution.status, 'partially-executable');
+                        assert.deepEqual(entry.execution.supportedCases, [
+                            { metadataType: 'query', tool: 'retrieve_mcdev_query' },
+                            { metadataType: 'script', tool: 'retrieve_mcdev_script' },
+                        ]);
+                        for (const supported of entry.execution.supportedCases) {
+                            assert.ok(tools.some((tool) => tool.name === supported.tool));
+                        }
+                        assert.match(
+                            entry.execution.remainingGuidanceOnlyScope,
+                            /All other metadata types/u
+                        );
+                        assert.match(
+                            entry.execution.restrictions,
+                            /no arbitrary type, argv, flags or broad selectors/u
+                        );
+                    } else {
+                        assert.equal(entry.execution.status, 'guidance-only');
+                        assert.match(entry.execution.reason, /No execution adapter exists/u);
+                        assert.equal(entry.execution.supportedCases, undefined);
+                    }
                     if (
                         [
                             'clone',
@@ -83,7 +104,9 @@ test('command catalog tools expose reviewed declarations only', { timeout: 30_00
                         assert.equal(entry.reviewedEffects.status, 'partial-source-review');
                         assert.match(entry.execution.reason, /remain unverified/u);
                     } else {
-                        assert.match(entry.execution.reason, /have not been reviewed/u);
+                        if (entry.name !== 'retrieve') {
+                            assert.match(entry.execution.reason, /have not been reviewed/u);
+                        }
                         assert.equal(entry.reviewedEffects, undefined);
                     }
                     assert.equal(entry.approved, undefined);

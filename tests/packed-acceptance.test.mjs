@@ -10,6 +10,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repo = fileURLToPath(new URL('../', import.meta.url));
+const expectedVersion = json(path.join(repo, 'package.json')).version;
 
 /**
  * Run npm without a shell, preserving the explicit wiki source.
@@ -106,6 +107,11 @@ test(
                 16
             );
             assert.ok(!files.some((filename) => filename.startsWith('node_modules/')));
+            assert.ok(!files.some((filename) => /^(?:scripts|tests)\//u.test(filename)));
+            assert.ok(files.includes('dist/query-retrieve-preview.js'));
+            assert.ok(files.includes('dist/query-retrieve-execution.js'));
+            assert.ok(files.includes('dist/script-retrieve-execution.js'));
+            assert.ok(files.includes('dist/retrieve-log-diagnostics.js'));
         });
         fs.writeFileSync(
             path.join(fixture, 'package.json'),
@@ -138,7 +144,7 @@ test(
             const manifest = json(path.join(installed, 'server.json'));
             const mcdev = json(path.join(fixture, 'node_modules', 'mcdev', 'package.json'));
             const sdk = json(path.join(fixture, 'node_modules', 'sfmc-sdk', 'package.json'));
-            assert.equal(pkg.version, '1.0.0');
+            assert.equal(pkg.version, expectedVersion);
             assert.equal(manifest.version, pkg.version);
             assert.equal(manifest.name, pkg.mcpName);
             for (const entry of manifest.packages) {
@@ -250,19 +256,30 @@ test(
             assert.notEqual(result.isError, true, JSON.stringify(result));
             return result.content.map((entry) => entry.text).join('\n');
         }
-        await t.test('stdio starts quietly and initializes with version 1.0.0', async () => {
-            await delay(500);
-            assert.deepEqual(lines, []);
-            const result = await request('initialize', {
-                protocolVersion: '2024-11-05',
-                capabilities: {},
-                clientInfo: { name: 'packed-acceptance', version: '1.0.0' },
+        const callLogDiagnosis = (arguments_) =>
+            request('tools/call', {
+                name: 'diagnose_mcdev_retrieve_logs',
+                arguments: arguments_,
             });
-            assert.deepEqual(result.serverInfo, { name: 'mcp-server-mcdev', version: '1.0.0' });
-            child.stdin.write(
-                JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n'
-            );
-        });
+        await t.test(
+            'stdio starts quietly and initializes with the owning release version',
+            async () => {
+                await delay(500);
+                assert.deepEqual(lines, []);
+                const result = await request('initialize', {
+                    protocolVersion: '2024-11-05',
+                    capabilities: {},
+                    clientInfo: { name: 'packed-acceptance', version: '1.0.0' },
+                });
+                assert.deepEqual(result.serverInfo, {
+                    name: 'mcp-server-mcdev',
+                    version: expectedVersion,
+                });
+                child.stdin.write(
+                    JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n'
+                );
+            }
+        );
         await t.test(
             'preserves existing tools, adds section retrieval and filters metadata',
             async () => {
@@ -286,6 +303,11 @@ test(
                         'resolve_mcdev_project_artifact',
                         'read_mcdev_artifact_source',
                         'preview_mcdev_project_command',
+                        'prepare_mcdev_query_retrieve',
+                        'retrieve_mcdev_query',
+                        'retrieve_mcdev_script',
+                        'render_mcdev_query_definition',
+                        'diagnose_mcdev_retrieve_logs',
                         'preview_mcdev_project_config',
                     ].toSorted()
                 );
@@ -300,6 +322,273 @@ test(
                     await tool('mcdev_list_metadata_types', { filter: 'no-such-type-acceptance' }),
                     /0 type\(s\)[\s\S]*No types match the filter/
                 );
+            }
+        );
+        await t.test(
+            'installed Git range intent is additive, directional and strictly sanitized',
+            async () => {
+                const input = {
+                    workspaceRoot: fixture,
+                    sourceRef: 'main',
+                    targetRef: 'refs/heads/main',
+                };
+                const baseline = JSON.parse(await tool('inspect_mcdev_git_range', input));
+                assert.equal(Object.hasOwn(baseline, 'promotionAssessment'), false);
+                assert.equal(baseline.ancestry, 'unknown');
+                for (const declaredEdge of ['promotion', 'back-promotion']) {
+                    const report = JSON.parse(
+                        await tool('inspect_mcdev_git_range', { ...input, declaredEdge })
+                    );
+                    assert.deepEqual(report, {
+                        ...baseline,
+                        promotionAssessment: {
+                            declaredEdge,
+                            direction: 'source-to-target',
+                            basis: 'exact-source-commit-ancestry',
+                            status: 'unknown',
+                            policySource: 'caller-declared',
+                        },
+                    });
+                }
+                for (const extra of [
+                    { declaredEdge: 'acceptance-secret-invalid' },
+                    { declaredEdge: null },
+                    { 'acceptance-secret-property': true },
+                ]) {
+                    const result = await request('tools/call', {
+                        name: 'inspect_mcdev_git_range',
+                        arguments: { ...input, ...extra },
+                    });
+                    assert.equal(result.isError, true);
+                    assert.match(
+                        result.content[0].text,
+                        /Project Git range inspection unavailable\./u
+                    );
+                    assert.doesNotMatch(
+                        JSON.stringify(result),
+                        /acceptance-secret|acceptance-auth/u
+                    );
+                }
+            }
+        );
+        await t.test(
+            'installed query preparation is non-executing and safely blocked',
+            async () => {
+                const result = await request('tools/call', {
+                    name: 'prepare_mcdev_query_retrieve',
+                    arguments: {
+                        workspaceRoot: fixture,
+                        credential: 'synthetic',
+                        businessUnit: 'QA',
+                        key: 'Example_1',
+                    },
+                });
+                assert.equal(result.isError, true);
+                assert.equal(result.content[0].text, 'Query retrieve preparation unavailable.');
+                assert.doesNotMatch(JSON.stringify(result), /acceptance-secret|acceptance-auth/u);
+            }
+        );
+        await t.test(
+            'installed production query executor fails safely before native launch',
+            async () => {
+                const result = await request('tools/call', {
+                    name: 'retrieve_mcdev_query',
+                    arguments: {
+                        workspaceRoot: fixture,
+                        credential: 'synthetic',
+                        businessUnit: 'QA',
+                        key: 'Example_1',
+                    },
+                });
+                assert.equal(result.isError, true);
+                assert.equal(result.content[0].text, 'Query retrieve unavailable.');
+                assert.doesNotMatch(JSON.stringify(result), /acceptance-secret|acceptance-auth/u);
+                assert.equal(fs.existsSync(path.join(fixture, 'retrieve')), false);
+            }
+        );
+        await t.test(
+            'installed Script metadata executor rejects unsupported scope safely',
+            async () => {
+                for (const extra of [{}, { key: '*' }, { metadataType: 'query' }]) {
+                    const result = await request('tools/call', {
+                        name: 'retrieve_mcdev_script',
+                        arguments: {
+                            workspaceRoot: fixture,
+                            credential: 'synthetic',
+                            businessUnit: 'QA',
+                            key: 'Example_1',
+                            ...extra,
+                        },
+                    });
+                    assert.equal(result.isError, true);
+                    assert.match(result.content[0].text, /Script retrieve unavailable\./u);
+                    assert.doesNotMatch(
+                        JSON.stringify(result),
+                        /acceptance-secret|acceptance-auth/u
+                    );
+                    assert.equal(fs.existsSync(path.join(fixture, 'retrieve')), false);
+                }
+            }
+        );
+        await t.test(
+            'installed render schema and unavailable selectors are bounded and non-executing',
+            async () => {
+                const listed = await request('tools/list');
+                const render = listed.tools.find(
+                    (entry) => entry.name === 'render_mcdev_query_definition'
+                );
+                const selection = {
+                    workspaceRoot: fixture,
+                    credential: 'synthetic',
+                    businessUnit: 'QA',
+                    templateName: 'Source_1',
+                    market: 'qa',
+                };
+                assert.equal(listed.tools.length, 22);
+                assert.deepEqual(render.inputSchema.required, Object.keys(selection));
+                assert.deepEqual(
+                    Object.keys(render.inputSchema.properties),
+                    Object.keys(selection)
+                );
+                assert.equal(render.inputSchema.additionalProperties, false);
+                for (const property of Object.values(render.inputSchema.properties))
+                    assert.deepEqual(property, { type: 'string' });
+                assert.deepEqual(render.annotations, {
+                    readOnlyHint: false,
+                    destructiveHint: true,
+                    idempotentHint: false,
+                    openWorldHint: true,
+                });
+                const before = fs.readdirSync(fixture);
+                const configBefore = fs.readFileSync(path.join(fixture, '.mcdevrc.json'));
+                for (const args of [
+                    {},
+                    { ...selection, 'acceptance-secret-extra': true },
+                    ...Object.keys(selection).map((key) => ({
+                        ...selection,
+                        [key]: ['acceptance-secret-invalid'],
+                    })),
+                ]) {
+                    const result = await request('tools/call', {
+                        name: render.name,
+                        arguments: args,
+                    });
+                    assert.equal(result.isError, true);
+                    assert.match(result.content[0].text, /Query definition render unavailable\./u);
+                    assert.doesNotMatch(
+                        JSON.stringify(result),
+                        /acceptance-secret|acceptance-auth|ZodError|ENOENT/u
+                    );
+                }
+                for (const extra of [
+                    {},
+                    { templateName: '*' },
+                    { market: 'one,two' },
+                    { credential: 'acceptance-secret-invalid' },
+                    { workspaceRoot: 'relative-private-root' },
+                ]) {
+                    const result = await request('tools/call', {
+                        name: render.name,
+                        arguments: { ...selection, ...extra },
+                    });
+                    assert.notEqual(result.isError, true);
+                    assert.deepEqual(JSON.parse(result.content[0].text), {
+                        outcome: 'unavailable',
+                        processOutcome: null,
+                        projectBlocked: false,
+                        destinations: [],
+                        artifactCompletenessVerified: false,
+                        remoteCompletenessVerified: false,
+                        languageValidationPerformed: false,
+                    });
+                    assert.doesNotMatch(
+                        JSON.stringify(result),
+                        /acceptance-secret|acceptance-auth|relative-private-root|stdout|stderr/u
+                    );
+                }
+                assert.deepEqual(fs.readdirSync(fixture), before);
+                assert.deepEqual(
+                    fs.readFileSync(path.join(fixture, '.mcdevrc.json')),
+                    configBefore
+                );
+            }
+        );
+        await t.test(
+            'installed historical-log diagnosis is strict and returns only finite observations',
+            async () => {
+                const configFile = path.join(fixture, '.mcdevrc.json');
+                const file = '2026-10-22T12.00.00.000Z.log';
+                const input = {
+                    workspaceRoot: fixture,
+                    credential: 'sample',
+                    businessUnit: 'Training',
+                    metadataType: 'query',
+                    key: 'Example_1',
+                    startedAfter: '2026-10-22T11:00:00.000Z',
+                    startedBefore: '2026-10-22T13:00:00.000Z',
+                };
+                try {
+                    fs.writeFileSync(
+                        configFile,
+                        JSON.stringify({
+                            credentials: { sample: { businessUnits: { Training: '1001' } } },
+                        })
+                    );
+                    const absent = await callLogDiagnosis(input);
+                    assert.deepEqual(JSON.parse(absent.content[0].text), {
+                        status: 'no-match',
+                        remoteCompletenessVerified: false,
+                        logs: [],
+                    });
+                    fs.mkdirSync(path.join(fixture, 'logs'));
+                    fs.writeFileSync(
+                        path.join(fixture, 'logs', file),
+                        [
+                            '14:00:00.000 debug: :: mcdev 10.1.0 :: ⚡ mcdev retrieve sample/Training query Example_1',
+                            '14:00:00.001 info: mcdev:: Retrieve',
+                            '14:00:00.002 info: :: Retrieving sample/Training',
+                            '14:00:00.003 info: Retrieving: query - Key: Example_1',
+                            '14:00:00.004 error: acceptance-secret-log-never-return',
+                        ].join('\n')
+                    );
+                    fs.writeFileSync(
+                        path.join(fixture, 'logs', file.replace('.log', '-errors.log')),
+                        'acceptance-secret-companion'
+                    );
+                    const result = await callLogDiagnosis(input);
+                    assert.deepEqual(JSON.parse(result.content[0].text), {
+                        status: 'matched',
+                        remoteCompletenessVerified: false,
+                        logs: [
+                            {
+                                file,
+                                invocationStartedAt: '2026-10-22T12:00:00.000Z',
+                                findings: [
+                                    { code: 'retrieve-start-observed', occurrences: 1 },
+                                    { code: 'type-key-observed', occurrences: 1 },
+                                ],
+                                suppressedRecordCount: 1,
+                            },
+                        ],
+                    });
+                    assert.doesNotMatch(
+                        JSON.stringify(result),
+                        /acceptance-secret|acceptance-auth/u
+                    );
+                    assert.ok(!JSON.stringify(result).includes(fixture));
+                    const malformed = await callLogDiagnosis({
+                        ...input,
+                        'acceptance-secret-property': true,
+                    });
+                    assert.equal(malformed.isError, true);
+                    assert.doesNotMatch(
+                        JSON.stringify(malformed),
+                        /acceptance-secret|acceptance-auth/u
+                    );
+                    assert.equal(fs.existsSync(path.join(fixture, 'retrieve')), false);
+                } finally {
+                    fs.writeFileSync(configFile, configText);
+                }
             }
         );
         await t.test('search source IDs resolve to complete bounded section pages', async () => {

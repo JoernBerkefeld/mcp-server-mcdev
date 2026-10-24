@@ -97,6 +97,71 @@ const bulkSourceReferences = Object.freeze([
     ),
 ]);
 
+const templateSourceReferences = Object.freeze([
+    ...sourceReferences,
+    ...[
+        [
+            'mcdev/lib/index.js',
+            1004,
+            'static async addDependentCbReferences(businessUnit, typeKeyList) {',
+        ],
+        ['mcdev/lib/index.js', 1101, 'static async addDependencies(businessUnit, typeKeyList) {'],
+        [
+            'mcdev/lib/index.js',
+            516,
+            'static async #retrieveBU(cred, bu, selectedTypesArr, keys, changelogOnly) {',
+        ],
+        [
+            'mcdev/lib/util/replaceContentBlockReference.js',
+            233,
+            'static async createCache(properties, buObject, retrieveSharedOnly = false) {',
+        ],
+        [
+            'mcdev/lib/util/replaceContentBlockReference.js',
+            283,
+            'static async _retrieveCache(buObject, properties, retrieveSharedOnly = false) {',
+        ],
+        [
+            'mcdev/lib/metadataTypes/MetadataType.js',
+            554,
+            'static async getCbReferenceKeys(keyArr, retrieveDir, findAssetKeys) {',
+        ],
+        [
+            'mcdev/lib/metadataTypes/MetadataType.js',
+            576,
+            'static async replaceCbReferenceLoop(metadataMap, retrieveDir, findAssetKeys) {',
+        ],
+        ['mcdev/lib/metadataTypes/MetadataType.js', 2659, 'static async getDependentFiles('],
+        [
+            'mcdev/lib/metadataTypes/Asset.js',
+            371,
+            "const uri = '/asset/v1/content/assets/query' + (loadShared ? '?scope=shared' : '');",
+        ],
+        [
+            'mcdev/lib/metadataTypes/Asset.js',
+            3155,
+            'static async replaceCbReference(item, retrieveDir, findAssetKeys) {',
+        ],
+        [
+            'mcdev/lib/metadataTypes/Asset.js',
+            3345,
+            'static async getCbReferenceKeys(keyArr, retrieveDir, findAssetKeys) {',
+        ],
+        [
+            'mcdev/lib/metadataTypes/Script.js',
+            410,
+            'static async replaceCbReference(item, retrieveDir, findAssetKeys) {',
+        ],
+        [
+            'mcdev/lib/metadataTypes/DataExtension.js',
+            1579,
+            'static async handleNotFoundDependencies(notFound) {',
+        ],
+    ].map(([file, line, anchor]) =>
+        Object.freeze({ file: String(file), line: Number(line), anchor: String(anchor) })
+    ),
+]);
+
 export const BUILD_EFFECTS = Object.freeze({
     build: Object.freeze({
         ...shared,
@@ -110,9 +175,10 @@ export const BUILD_EFFECTS = Object.freeze({
         ...shared,
         inputs: 'Uses current retrieved files, including name: lookup from local JSON to resolve keys. CLI requires a positional MARKET or --market; metadata selection is prepared by native helpers. Builder rejects subtype-qualified types.',
         localRemoval:
-            'The reviewed standalone template wrapper/base method has no purge or template-tree cleanup. It writes templates into the configured persistent template root; it does not perform build compound-command cleanup.',
+            'The standalone template wrapper/base method has no direct purge or template-tree cleanup and writes to the configured persistent template root, unlike compound build. Optional re-retrieve can nevertheless delete configured retrieve type/subtype outputs (no keys/no like, or truthy purge), or the BU retrieve root when no types remain. Keyed zero-saved REST retrieval can also invoke post-delete cleanup. No no-purge, run-owned/no-link cleanup or rollback guarantee follows; retrieval writes metadata and extracted companions. Normal logger output can also write outside retrieve/template.',
         retrieval:
-            'When dependencies is not enabled, calls _reRetrieve with alwaysAsk false: retrieve truthy enables remote retrieval and local input changes; omission does not ask through this helper. addDependencies and addDependentCbReferences are then invoked; their exact remote and filesystem effects remain unknown. CLI exposes dependencies, retrieve and shareAsset.',
+            'Without dependencies, _reRetrieve uses alwaysAsk false and selected keys: truthy retrieve runs retrieval without its optional prompt. Both dependency helpers return when dependencies is disabled. With dependencies, addDependencies calls _reRetrieve with alwaysAsk true: only interaction enabled plus retrieve undefined allows the default-false prompt; confirmation or truthy retrieve runs retrieval of configured metaDataTypes.retrieve collapsed to base types plus initially selected types, not just selected keys. False retrieve, or skipInteraction with undefined retrieve, suppresses this re-retrieve but not dependency cache reads. Local JSON dependency graphs and extracted code/ContentBlockByKey/Name/Id references are traversed recursively, expanding/deduplicating selection after initial filtering; dynamic references are not comprehensively resolved. Missing child-BU DataExtension dependencies can read configured retrieve/credential/_ParentBU_/dataExtension JSON for warnings, not automatically include parent DEs in the child package. Once dependencies is enabled and properties exist, addDependentCbReferences always calls createCache: SDK-backed remote folder and shared-asset reads occur even with retrieve false; local asset JSON and shared results populate memory. The shared asset endpoint uses REST POST /asset/v1/content/assets/query?scope=shared as a query, not asset creation. Discovery Sets guard saveToDisk and Asset extract/JSON persistence in the reviewed reference-scanning branches; this is not a blanket no-write claim. Reference options change in memory and the asset JSON cache resets on normal completion, not guaranteed after errors. Optional re-retrieve can run enabled retrieve validation, dynamically importing project .mcdev-validations.js and invoking its factory and rule passed/fix functions; skipValidation is not a no-hook-execution promise. Exact type overrides/companions, formatter/plugins, transitive helpers, SDK authentication/session persistence and arbitrary hook effects remain unknown. This partial source review is not an exhaustive transitive audit or local-only, dry-run or unattended-safety guarantee. CLI exposes dependencies, retrieve and shareAsset.',
+        sourceReferences: templateSourceReferences,
     }),
     buildDefinition: Object.freeze({
         ...shared,

@@ -42,7 +42,13 @@ test('four immutable build records retain canonical/alias identity and installed
         assert.equal(effects.status, 'partial-source-review');
         assert.ok(Object.isFrozen(effects));
         assert.ok(Object.isFrozen(effects.sourceReferences));
-        assert.equal(effects.sourceReferences.length, name === 'buildDefinitionBulk' ? 21 : 15);
+        const referenceCounts = {
+            build: 15,
+            buildTemplate: 28,
+            buildDefinition: 15,
+            buildDefinitionBulk: 21,
+        };
+        assert.equal(effects.sourceReferences.length, referenceCounts[name]);
         for (const { file, line, anchor } of effects.sourceReferences) {
             assert.equal(read(file.slice('mcdev/'.length)).split('\n')[line - 1].trim(), anchor);
         }
@@ -228,6 +234,206 @@ test('template retrieval and delegated effects are not treated as local-only', (
     assert.ok(!template.includes('purgeDeployFolder'));
     for (const name of ['build', 'buildTemplate'])
         assert.match(BUILD_EFFECTS[name].retrieval, /unknown/u);
+});
+
+test('template dependency retrieval broadens types only after opt-in or confirmation', () => {
+    const dependencies = between(
+        index,
+        '    static async addDependencies(',
+        '    static async build('
+    );
+    const references = between(
+        index,
+        '    static async addDependentCbReferences(',
+        '    static async addDependencies('
+    );
+    for (const block of [dependencies, references]) {
+        contains(block, ['if (!Util.OPTIONS.dependencies) {\n            return;\n        }']);
+    }
+    contains(dependencies, [
+        'await this._reRetrieve(businessUnit, true, null, typeKeyList);',
+        'await MetadataTypeInfo[type].getDependentFiles(',
+        'typeKeyList[type] = [...new Set(typeKeyList[type])];',
+    ]);
+    const retrieve = between(
+        index,
+        '    static async _reRetrieve(',
+        '    static async buildDefinition('
+    );
+    contains(retrieve, [
+        'if (!Util.OPTIONS.skipInteraction && Util.OPTIONS.retrieve === undefined && alwaysAsk)',
+        'default: false,',
+        'if (runRetrieveNow || Util.OPTIONS.retrieve)',
+        "properties.metaDataTypes.retrieve.map((type) => type.split('-', 1)[0])",
+        '...Object.keys(defaultPlusTheseTypes),',
+        'await this.retrieve(businessUnit, retrieveTypes);',
+    ]);
+    const cacheCall = references.indexOf(
+        'await ReplaceContentBlockReference.createCache(properties, buObject, true);'
+    );
+    assert.ok(cacheCall > references.indexOf('if (!properties)'));
+    assert.ok(!references.includes('Util.OPTIONS.retrieve'));
+    assert.ok(!references.includes('Util.OPTIONS.skipInteraction'));
+    contains(references, [
+        'const assetDependencies = new Set();',
+        'new Set(typeKeyList[depType])',
+        "MetadataTypeInfo['asset'].getJsonFromFSCache = null;",
+    ]);
+    assert.ok(!references.includes('finally'));
+    const effects = BUILD_EFFECTS.buildTemplate;
+    contains(effects.retrieval, [
+        'interaction enabled plus retrieve undefined',
+        'confirmation or truthy retrieve',
+        'base types plus initially selected types, not just selected keys',
+        'even with retrieve false',
+        'after initial filtering',
+        'remain unknown',
+        'SDK authentication/session persistence',
+        'not an exhaustive transitive audit',
+    ]);
+    assert.equal(effects.executionEnabled, undefined);
+    assert.equal(lookupCommand('bt').execution.status, 'guidance-only');
+});
+
+test('dependency caches read folders and shared assets using POST query, not create', () => {
+    const replacement = read('lib/util/replaceContentBlockReference.js');
+    const create = between(
+        replacement,
+        '    static async createCache(',
+        '    static createCacheForMap('
+    );
+    contains(create, ['await ReplaceContentBlockReference._retrieveCache(', 'retrieveSharedOnly']);
+    const cache = replacement.slice(replacement.indexOf('    static async _retrieveCache('));
+    contains(cache, [
+        'const client = auth.getSDK(buObject);',
+        "await Folder.retrieveForCache(null, ['asset', 'asset-shared'])",
+        'if (retrieveSharedOnly)',
+        'Asset.getJsonFromFSCache = await Asset.getJsonFromFS(',
+        'localAssets = Asset.getJsonFromFSCache;',
+        'await Asset.retrieveForCache(\n                undefined,\n                Asset.definition.crosslinkedSubTypes,\n                undefined,\n                true',
+    ]);
+    contains(read('lib/metadataTypes/Folder.js'), [
+        'return this.retrieve(null, null, subTypeArr, null);',
+    ]);
+    const asset = read('lib/metadataTypes/Asset.js');
+    contains(asset, [
+        'return this.retrieve(null, null, subTypeArr, undefined, loadShared);',
+        "const uri = '/asset/v1/content/assets/query' + (loadShared ? '?scope=shared' : '');",
+        'const response = await this.client.rest.post(uri, payload);',
+    ]);
+    contains(BUILD_EFFECTS.buildTemplate.retrieval, [
+        'remote folder and shared-asset reads',
+        'as a query, not asset creation',
+    ]);
+});
+
+test('recursive local JSON and code discovery guards only reviewed persistence branches', () => {
+    const dependencies = between(
+        metadata,
+        '    static async getDependentFiles(',
+        '    static getNestedValue('
+    );
+    contains(dependencies, [
+        'await this.getFilesToCommit(keyArr)',
+        'metadataItem = await File.readJson(filePath);',
+        'this.definition.dependencyGraph',
+        'this.getDependentFilesExtra(metadataItem, dependentTypeKeyCombo);',
+        'await MetadataTypeInfo[type].getDependentFiles(',
+        'await this.handleNotFoundDependencies(notFound)',
+    ]);
+    const baseLoop = between(
+        metadata,
+        '    static async replaceCbReferenceLoop(',
+        '    static async '
+    );
+    contains(baseLoop, ['if (!findAssetKeys) {\n                        await this.saveToDisk(']);
+    const asset = read('lib/metadataTypes/Asset.js');
+    const scan = between(
+        asset,
+        '    static async replaceCbReference(item,',
+        '    static async replaceCbReferenceLoop('
+    );
+    contains(scan, [
+        'await this._mergeCode(',
+        'findAssetKeys',
+        'if (!findAssetKeys) {\n            // save',
+        'await File.writeToFile(',
+        'await File.writeJSONToFile(',
+    ]);
+    assert.ok(
+        scan.indexOf('if (!findAssetKeys) {\n            // save') <
+            scan.indexOf('await File.writeToFile(')
+    );
+    const recursion = between(
+        asset,
+        '    static async getCbReferenceKeys(',
+        '    static getDependentFilesExtra('
+    );
+    contains(recursion, [
+        'await this.getJsonFromFS(',
+        'keyArr.push(value);',
+        'await this.getCbReferenceKeys(keyArr, retrieveDir, new Set(keysToCrawl))',
+    ]);
+    contains(read('lib/metadataTypes/Script.js'), [
+        'const code = await this._mergeCode(item, retrieveDir);',
+        'ReplaceCbReference.replaceReference(code, parentName, findAssetKeys)',
+    ]);
+    const parent = between(
+        read('lib/metadataTypes/DataExtension.js'),
+        '    static async handleNotFoundDependencies(',
+        '    static '
+    );
+    contains(parent, [
+        'if (this.buObject.eid === this.buObject.mid)',
+        'this.properties.directories.retrieve,',
+        'Util.parentBuName,',
+        'metadataItem = await File.readJson(filePath);',
+        "contentType === 'shared_dataextension'",
+        "contentType === 'synchronizeddataextension'",
+    ]);
+    contains(BUILD_EFFECTS.buildTemplate.retrieval, [
+        '_ParentBU_/dataExtension JSON for warnings',
+        'Discovery Sets guard',
+        'not a blanket no-write claim',
+        'dynamic references are not comprehensively resolved',
+    ]);
+});
+
+test('optional template retrieve can clean outputs, write results and execute validation hooks', () => {
+    const retrieve = between(index, '    static async #retrieveBU(', '    static async ');
+    contains(retrieve, [
+        'const areKeySet = Array.isArray(selectedTypesArr)',
+        'if ((!areKeySet && !Util.OPTIONS.like) || Util.OPTIONS.purge)',
+        'await File.remove(File.normalizePath(removePathArr));',
+        'if (!retrieveTypesArr.length)',
+        'await File.remove(File.normalizePath([properties.directories.retrieve, cred, bu]));',
+    ]);
+    const rest = between(
+        metadata,
+        '    static async retrieveREST(',
+        '    static async retrieveRESTcollection('
+    );
+    contains(rest, ['await this.postDeleteTasks(singleRetrieve);']);
+    const cleanup = between(metadata, '    static async postDeleteTasks(', '    static async ');
+    contains(cleanup, ['await File.remove(jsonFile);']);
+    const save = between(metadata, '    static async saveResults(', '    static async saveToDisk(');
+    contains(save, ["'retrieve',", 'await this.validation(', 'await this.saveToDisk(']);
+    assert.ok(save.indexOf('await this.validation(') < save.indexOf('await this.saveToDisk('));
+    contains(validations, [
+        "path.resolve(root, '.mcdev-validations.js')",
+        'customRuleImport = await import(rulesUrl);',
+        'await customRuleImport.validation(',
+    ]);
+    contains(BUILD_EFFECTS.buildTemplate.localRemoval, [
+        'Optional re-retrieve can nevertheless delete',
+        'writes metadata and extracted companions',
+        'Normal logger output',
+    ]);
+    contains(BUILD_EFFECTS.buildTemplate.retrieval, [
+        'enabled retrieve validation',
+        'skipValidation is not a no-hook-execution promise',
+        'arbitrary hook effects remain unknown',
+    ]);
 });
 
 test('base definition validates before writes and can execute project validation hooks', () => {

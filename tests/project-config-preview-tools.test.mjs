@@ -83,7 +83,38 @@ test(
                         (entry) => entry.name === 'preview_mcdev_project_config'
                     );
                     assert.ok(tool);
-                    assert.equal(tools.length, 17);
+                    assert.equal(tools.length, 22);
+                    assert.deepEqual(
+                        tools.map((entry) => entry.name).toSorted(),
+                        [
+                            'diagnose_mcdev_retrieve_logs',
+                            'prepare_mcdev_query_retrieve',
+                            'retrieve_mcdev_query',
+                            'retrieve_mcdev_script',
+                            'mcdev_search_docs',
+                            'mcdev_get_doc_section',
+                            'mcdev_explain_config_key',
+                            'mcdev_component_checklist',
+                            'mcdev_list_metadata_types',
+                            'mcdev_list_commands',
+                            'mcdev_get_command',
+                            'read_mcdev_project_config',
+                            'diagnose_mcdev_project_config',
+                            'preview_mcdev_project_config',
+                            'inspect_mcdev_git_policy',
+                            'inspect_mcdev_git_range',
+                            'inspect_mcdev_project',
+                            'inventory_mcdev_project_artifacts',
+                            'resolve_mcdev_project_artifact',
+                            'read_mcdev_artifact_source',
+                            'preview_mcdev_project_command',
+                            'render_mcdev_query_definition',
+                        ].toSorted()
+                    );
+                    assert.ok(tools.some((entry) => entry.name === 'retrieve_mcdev_script'));
+                    assert.ok(tools.some((entry) => entry.name === 'retrieve_mcdev_query'));
+                    assert.ok(!tools.some((entry) => entry.name === 'accept_fixed_query_retrieve'));
+                    assert.ok(tools.some((entry) => entry.name === 'prepare_mcdev_query_retrieve'));
                     assert.deepEqual(Object.keys(tool.inputSchema.properties), [
                         'workspaceRoot',
                         'proposedConfig',
@@ -202,6 +233,80 @@ test(
                         arguments: { workspaceRoot: root },
                     });
                     assert.equal(read.content[0].text, rawText);
+                    unchanged();
+                }
+            );
+            await t.test(
+                'composed proposed references retain exact paths and whole-result budget without writes',
+                async () => {
+                    const proposed = structuredClone(config);
+                    proposed.marketList.deploy['first/source'] = [
+                        'old',
+                        ['old', 'proposed-missing'],
+                        [null, ['deeper-missing']],
+                        [],
+                    ];
+                    const text = `${JSON.stringify(proposed, null, 2)}\n`;
+                    const before = structuredClone(proposed);
+                    const response = await invoke(text);
+                    assert.notEqual(response.isError, true);
+                    assert.match(response.content[0].text, /^FIRST.*Pipeline Builder/u);
+                    const result = JSON.parse(response.content[1].text);
+                    assert.deepEqual(result, previewProjectConfig(project, text));
+                    assert.deepEqual(
+                        result.diagnosis.findings.map(({ code, path }) => ({ code, path })),
+                        [
+                            {
+                                code: 'unresolved-market',
+                                path: '$.marketList["deploy"]["first/source"][1][1]',
+                            },
+                            {
+                                code: 'unsupported-market-shape',
+                                path: '$.marketList["deploy"]["first/source"][2][0]',
+                            },
+                            {
+                                code: 'unsupported-market-shape',
+                                path: '$.marketList["deploy"]["first/source"][2][1]',
+                            },
+                        ]
+                    );
+                    assert.deepEqual(result.changes, [
+                        {
+                            op: 'replace',
+                            path: '/marketList/deploy/first~1source',
+                            before: 'old',
+                            after: proposed.marketList.deploy['first/source'],
+                        },
+                    ]);
+                    assert.equal(result.current.sha256, hash(rawText));
+                    assert.equal(result.proposed.sha256, hash(text));
+                    assert.ok(
+                        result.diagnosis.limitations.some((value) =>
+                            /native command success remain unverified/u.test(value)
+                        )
+                    );
+                    const bytes = Buffer.byteLength(response.content[1].text);
+                    const exact = await invoke(text, { maxOutputBytes: bytes });
+                    assert.notEqual(exact.isError, true);
+                    assert.deepEqual(JSON.parse(exact.content[1].text), result);
+                    const tooSmall = await invoke(text, { maxOutputBytes: bytes - 1 });
+                    assert.equal(tooSmall.isError, true);
+                    assert.deepEqual(tooSmall.content, [
+                        {
+                            type: 'text',
+                            text: JSON.stringify({
+                                complete: false,
+                                code: 'output-budget',
+                                message: 'Project configuration preview incomplete.',
+                            }),
+                        },
+                    ]);
+                    assert.doesNotMatch(
+                        JSON.stringify(tooSmall),
+                        /proposed-missing|deeper-missing/u
+                    );
+                    assert.deepEqual(proposed, before);
+                    assert.deepEqual(project.config, config);
                     unchanged();
                 }
             );

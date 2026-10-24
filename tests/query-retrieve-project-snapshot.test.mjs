@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { QUERY_RETRIEVE_CONTRACT } from '../dist/query-retrieve-contract.js';
 import { test } from 'node:test';
 import {
     collectQueryProjectSnapshot,
@@ -74,6 +75,69 @@ test('real config accessor derives exact qualified MID and immutable gate-compat
     assert.ok(Object.isFrozen(checked));
     input.key = 'changed';
     assert.equal(collected.key, 'sample');
+});
+
+test('closed internal script selection binds its contract while preserving legacy query hashes', async () => {
+    const input = fixture();
+    const query = collectQueryProjectSnapshot(input);
+    const explicitQuery = collectQueryProjectSnapshot({ ...input, metadataType: 'query' });
+    assert.deepEqual(explicitQuery, query);
+    const legacyIdentity = {
+        basis: 'config-only-decoded-text-utf8-v1',
+        projectRoot: query.projectRoot,
+        credential: query.credential,
+        businessUnit: query.businessUnit,
+        mid: query.mid,
+        key: query.key,
+        configTextHash: createHash('sha256').update(JSON.stringify(config()), 'utf8').digest('hex'),
+        contract: QUERY_RETRIEVE_CONTRACT,
+    };
+    assert.equal(
+        query.snapshot,
+        createHash('sha256').update(JSON.stringify(legacyIdentity), 'utf8').digest('hex')
+    );
+    const script = collectQueryProjectSnapshot({ ...input, metadataType: 'script' });
+    assert.equal(script.metadataType, 'script');
+    assert.notEqual(script.snapshot, query.snapshot);
+    assert.ok(Object.isFrozen(script));
+    assert.equal((await recheckQueryProjectSnapshot(script)).ready, true);
+    assert.equal(
+        (await recheckQueryProjectSnapshot({ ...query, metadataType: 'script' })).ready,
+        false
+    );
+    assert.equal(
+        (await recheckQueryProjectSnapshot({ ...script, metadataType: 'query' })).ready,
+        false
+    );
+    for (const metadataType of ['asset', '', null, 1, {}, ['script']]) {
+        rejects({ ...input, metadataType });
+    }
+    write(input, JSON.stringify(config()) + '\n');
+    assert.equal((await recheckQueryProjectSnapshot(script)).ready, false);
+});
+
+test('script snapshots retain selector and no-link config boundaries without opening auth', async () => {
+    const input = { ...fixture(), metadataType: 'script' };
+    for (const field of ['credential', 'businessUnit', 'key']) {
+        for (const value of ['*', 'a,b', '../a', 'name:sample', '.mcdev-auth.json']) {
+            rejects({ ...input, [field]: value });
+        }
+    }
+    const open = fs.openSync;
+    fs.openSync = (candidate, ...args) => {
+        assert.equal(candidate, path.join(input.projectRoot, '.mcdevrc.json'));
+        return open(candidate, ...args);
+    };
+    try {
+        const script = collectQueryProjectSnapshot(input);
+        assert.equal((await recheckQueryProjectSnapshot(script)).ready, true);
+        rejects({ ...input, projectRoot: path.join(input.projectRoot, '.mcdev-auth.json') });
+    } finally {
+        fs.openSync = open;
+    }
+    const alias = path.join(runRoot, `script-junction-${randomUUID()}`);
+    fs.symlinkSync(input.projectRoot, alias, 'junction');
+    rejects({ ...input, projectRoot: alias });
 });
 
 test('positive safe numeric and positive digit-string MIDs follow exact normalization rules', () => {

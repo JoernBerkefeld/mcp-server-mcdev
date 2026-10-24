@@ -75,7 +75,11 @@ describe('release runtime contract', () => {
     const manifest = JSON.parse(readFileSync(path.join(repoRoot, 'server.json'), 'utf8'));
 
     test('aligns the package, lock and MCP manifest versions', () => {
-        assert.equal(pkg.version, '1.0.0');
+        assert.equal(pkg.name, 'mcp-server-mcdev');
+        assert.match(
+            pkg.version,
+            /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[\dA-Za-z-]+(?:\.[\dA-Za-z-]+)*)?(?:\+[\dA-Za-z-]+(?:\.[\dA-Za-z-]+)*)?$/u
+        );
         assert.equal(lock.version, pkg.version);
         assert.equal(lock.packages[''].version, pkg.version);
         assert.equal(manifest.version, pkg.version);

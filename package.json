@@ -40,6 +40,7 @@
     ],
     "scripts": {
         "prepublishOnly": "npm run build",
+        "version": "node scripts/sync-server-version.mjs",
         "bundle-wiki": "node scripts/bundle-wiki.mjs",
         "build": "npm run bundle-wiki && tsc -p tsconfig.json",
         "dev": "tsc -p tsconfig.json --watch",

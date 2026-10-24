@@ -95,6 +95,12 @@ test(
                     'workspaceRoot',
                     'sourceRef',
                     'targetRef',
+                    'declaredEdge',
+                ]);
+                assert.equal(tool.inputSchema.additionalProperties, false);
+                assert.deepEqual(tool.inputSchema.properties.declaredEdge.enum, [
+                    'promotion',
+                    'back-promotion',
                 ]);
                 assert.equal(tool.inputSchema.properties.workspaceRoot.type, 'string');
                 for (const key of ['sourceRef', 'targetRef']) {
@@ -155,6 +161,48 @@ test(
                 }
             );
             await t.test(
+                'optional intent preserves unknown evidence and sanitizes strict SDK errors',
+                async () => {
+                    for (const declaredEdge of ['promotion', 'back-promotion']) {
+                        const response = await invoke({ ...args, declaredEdge });
+                        assert.notEqual(response.isError, true);
+                        assert.deepEqual(
+                            JSON.parse(response.content[0].text),
+                            inspectProjectGitRange(
+                                root,
+                                args.sourceRef,
+                                args.targetRef,
+                                declaredEdge
+                            )
+                        );
+                        assert.equal(
+                            JSON.parse(response.content[0].text).promotionAssessment.status,
+                            'unknown'
+                        );
+                    }
+                    for (const extra of [
+                        ...[
+                            null,
+                            '',
+                            'PRIVATE-value',
+                            7,
+                            true,
+                            [],
+                            { 'PRIVATE-property': true },
+                        ].map((declaredEdge) => ({ declaredEdge })),
+                        { 'PRIVATE-property': 'PRIVATE-value' },
+                    ]) {
+                        const response = await invoke({ ...args, ...extra });
+                        assert.equal(response.isError, true);
+                        assert.match(
+                            response.content[0].text,
+                            /Project Git range inspection unavailable\./u
+                        );
+                        assert.doesNotMatch(JSON.stringify(response), /PRIVATE/u);
+                    }
+                }
+            );
+            await t.test(
                 'invalid roots and malformed config expose only a fixed safe error',
                 async () => {
                     const malformed = fs.realpathSync.native(
@@ -207,9 +255,10 @@ const expected = [
     [['rev-parse', '--verify', '--symbolic-full-name', '--end-of-options', 'refs/heads/main'], 'refs/heads/main\n'],
     [['rev-parse', '--verify', '--end-of-options', 'refs/heads/main^{commit}'], '${hash}\n'],
 ];
+let calls = 0;
 childProcess.spawnSync = (command, argv, options) => {
     if (command !== 'git') return original(command, argv, options);
-    const next = expected.shift();
+    const next = expected[calls++ % expected.length];
     assert.ok(next, 'unexpected Git operation');
     assert.deepEqual(argv.slice(6), next[0]);
     assert.equal(options.cwd, ${JSON.stringify(root)});
@@ -236,6 +285,23 @@ await import(${JSON.stringify(entry.href)});
                 limitations: inspectProjectGitRange(root, args.sourceRef, args.targetRef)
                     .limitations,
             });
+            for (const declaredEdge of ['promotion', 'back-promotion']) {
+                const annotated = await client.callTool({
+                    name,
+                    arguments: { ...args, declaredEdge },
+                });
+                assert.notEqual(annotated.isError, true);
+                assert.deepEqual(JSON.parse(annotated.content[0].text), {
+                    ...report,
+                    promotionAssessment: {
+                        declaredEdge,
+                        direction: 'source-to-target',
+                        basis: 'exact-source-commit-ancestry',
+                        status: 'contained',
+                        policySource: 'caller-declared',
+                    },
+                });
+            }
         }, bootstrap);
     }
 );

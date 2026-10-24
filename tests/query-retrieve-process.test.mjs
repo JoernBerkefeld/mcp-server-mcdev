@@ -130,6 +130,87 @@ test('stub gets exactly fixed argv, canonical cwd, no shell and closed stdin', a
     assert.equal(observed(f).cwd, f.input.projectRoot);
 });
 
+test('closed internal type selects fixed Script argv and preserves explicit Query defaults', async () => {
+    for (const metadataType of ['script', 'query']) {
+        const f = fixture('eof');
+        f.input.metadataType = metadataType;
+        const original = childProcess.spawn;
+        try {
+            childProcess.spawn = (command, argv, options) => {
+                assert.equal(command, process.execPath);
+                assert.equal(options.shell, false);
+                assert.deepEqual(options.stdio, ['ignore', 'pipe', 'pipe']);
+                assert.equal(options.cwd, f.input.projectRoot);
+                assert.equal(options.env.NODE_OPTIONS, undefined);
+                return original(command, argv, options);
+            };
+            syncBuiltinESMExports();
+            const result = await run(f);
+            safe(result);
+            assert.equal(result.exitCode, 0);
+            assert.deepEqual(observed(f).argv, [
+                'retrieve',
+                'demo alias/QA BU',
+                metadataType,
+                'eof',
+                '--no-purge',
+                '--no-format',
+                '--skipInteraction',
+                '--noLogFile',
+                '--noLogColors',
+            ]);
+        } finally {
+            childProcess.spawn = original;
+            syncBuiltinESMExports();
+        }
+    }
+    for (const metadataType of [null, '', 'asset', 'script,query', '--help', false, {}]) {
+        const f = fixture();
+        f.input.metadataType = metadataType;
+        assert.equal((await run(f)).outcome, 'invalid-input');
+        assert.equal(fs.existsSync(path.join(f.input.projectRoot, 'observed.json')), false);
+    }
+});
+
+test('Script uses the same environment, timeout, cancellation and output bounds', async () => {
+    for (const [key, expected] of [
+        ['hang', 'timed-out'],
+        ['flood', 'output-limit'],
+    ]) {
+        const f = fixture(key);
+        f.input.metadataType = 'script';
+        const result = await run(f, key === 'hang' ? 250 : 3000);
+        safe(result);
+        assert.equal(result.outcome, 'termination-unconfirmed');
+        assert.equal(result.stopReason, expected);
+    }
+    const f = fixture('hang');
+    f.input.metadataType = 'script';
+    const pending = run(f);
+    await waitForFile(path.join(f.input.projectRoot, 'observed.json'));
+    f.controller.abort('SECRET_CANCEL');
+    const result = await pending;
+    safe(result);
+    assert.equal(result.stopReason, 'cancelled');
+});
+
+test('Script rejects unsafe environment and selector before starting a process', async () => {
+    const f = fixture();
+    f.input.metadataType = 'script';
+    const previous = process.env.TMPDIR;
+    try {
+        process.env.TMPDIR = 'relative-not-temp';
+        assert.equal((await run(f)).outcome, 'invalid-input');
+        assert.equal(fs.existsSync(path.join(f.input.projectRoot, 'observed.json')), false);
+    } finally {
+        if (previous === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = previous;
+    }
+    f.input.key = '../outside';
+    assert.equal((await run(f)).outcome, 'invalid-input');
+    assert.equal(fs.existsSync(path.join(f.input.projectRoot, 'observed.json')), false);
+});
+
 test('explicit environment excludes case-insensitive injection and arbitrary secrets', async () => {
     const names = [
         'NODE_OPTIONS',
@@ -260,6 +341,17 @@ test('pre-aborted request never starts child', async () => {
     assert.equal(result.outcome, 'cancelled');
     assert.equal(result.stopReason, 'cancelled');
     assert.equal(result.started, false);
+});
+
+test('adapter retains invalid selector precedence over pre-aborted cancellation', async () => {
+    const f = fixture('../outside');
+    f.controller.abort();
+    const result = await run(f);
+    safe(result);
+    assert.equal(result.outcome, 'invalid-input');
+    assert.equal(result.stopReason, null);
+    assert.equal(result.partialEffectsPossible, false);
+    assert.equal(fs.existsSync(path.join(f.input.projectRoot, 'observed.json')), false);
 });
 
 test('cancellation is terminal with conservative descendant status', async () => {

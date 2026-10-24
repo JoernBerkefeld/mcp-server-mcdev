@@ -126,6 +126,25 @@ export function diagnoseProjectConfig(project: ProjectConfig): ProjectConfigDiag
             );
         }
     };
+    const checkReference = (reference: unknown, location: string): void => {
+        if (typeof reference !== 'string') {
+            add(
+                'unsupported-market-shape',
+                location,
+                'Expected a string market reference; non-string members and arrays deeper than two levels are not validated.',
+                'mcdev/lib/Builder.js: buildDefinitionBulk',
+                'warning'
+            );
+        } else if (!owns(markets, reference)) {
+            add(
+                'unresolved-market',
+                location,
+                `Market ${JSON.stringify(reference)} is not defined.`,
+                UTIL,
+                'warning'
+            );
+        }
+    };
     for (const [name, value] of Object.entries(lists)) {
         const location = at('$.marketList', name);
         const list = object(value, location);
@@ -143,25 +162,20 @@ export function diagnoseProjectConfig(project: ProjectConfig): ProjectConfigDiag
                 );
             }
             checkBu(bu, referencePath);
-            const refs = typeof market === 'string' ? [market] : market;
-            if (!stringList(refs)) {
-                add(
-                    'unsupported-market-shape',
-                    referencePath,
-                    'Only string and flat string-array market references are diagnosed; other shapes are not validated.',
-                    UTIL,
-                    'warning'
-                );
+            if (!Array.isArray(market)) {
+                checkReference(market, referencePath);
                 continue;
             }
-            for (const reference of refs as string[]) {
-                if (!owns(markets, reference)) {
-                    add(
-                        'unresolved-market',
-                        referencePath,
-                        `Market ${JSON.stringify(reference)} is not defined.`,
-                        UTIL,
-                        'warning'
+            for (const [index, reference] of market.entries()) {
+                if (Array.isArray(reference)) {
+                    for (const [memberIndex, member] of reference.entries()) {
+                        checkReference(member, `${referencePath}[${index}][${memberIndex}]`);
+                    }
+                } else {
+                    // Preserve the existing unindexed paths for flat string references.
+                    checkReference(
+                        reference,
+                        typeof reference === 'string' ? referencePath : `${referencePath}[${index}]`
                     );
                 }
             }
@@ -235,9 +249,9 @@ export function diagnoseProjectConfig(project: ProjectConfig): ProjectConfigDiag
                 'Load your existing .mcdevrc.json, review environments, credential-qualified BU mappings and market variables, then review the export before replacing anything. Never load .mcdev-auth.json. Read-only diagnosis can proceed without the builder.',
         },
         limitations: [
-            'Partial static diagnosis, not native mcdev validation or proof that deployment will succeed. Missing sections are not upgrade errors here.',
+            'Partial static diagnosis, not native mcdev validation or proof that deployment will succeed. Missing sections are not upgrade errors here. Market references are inspected statically through at most two array levels. Empty arrays provide no references to check, not proof of a usable native configuration.',
             'No auth, hooks, files, native CLI or live account checks. Unknown and user-owned fields remain untouched.',
-            'Market variable contents, filters, nested market composition, targetBranchBuMapping, metadata-type names, version compatibility and other options are not validated.',
+            'Market variable contents, filters, targetBranchBuMapping, metadata-type names, version compatibility and other options are not validated. Native buildDefinitionBulk iterates composition members, but verifyMarketList checks outer entries against markets. Composition acceptance, rendering, overlay precedence and native command success remain unverified.',
             'Reference warnings may describe intentional native example placeholders; they are not structural errors.',
         ],
     };

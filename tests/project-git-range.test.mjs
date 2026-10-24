@@ -223,6 +223,63 @@ test('real unborn repository has unknown endpoints without synthetic commits', (
     assert.deepEqual(result.findings, ['endpoint-unverified']);
 });
 
+test('caller-declared edges annotate every relation without changing evidence or Git calls', () => {
+    const cases = [
+        [endpoints(source), 'contained'],
+        [[...endpoints(), output('', 0), output('', 1)], 'not-contained'],
+        [[...endpoints(), output('', 1), output('', 0)], 'contained'],
+        [[...endpoints(), output('', 1), output('', 1), output('false\n')], 'not-contained'],
+        [[...endpoints(), output('', 1), output('', 1), output('true\n')], 'unknown'],
+        [[...endpoints(), output('', 1), output('', 1), output('PRIVATE')], 'unknown'],
+        [[...endpoints(), output('', 128), output('', 1)], 'unknown'],
+        [[output('', 128), output('', 128)], 'unknown'],
+    ];
+    for (const [responses, status] of cases) {
+        const baseline = mocked([...responses]);
+        assert.equal(Object.hasOwn(baseline.result, 'promotionAssessment'), false);
+        for (const declaredEdge of ['promotion', 'back-promotion']) {
+            const { result, calls } = mocked([...responses], () =>
+                inspectProjectGitRange(root, 'feature/topic', 'origin/main', declaredEdge)
+            );
+            const { promotionAssessment, ...evidence } = result;
+            assert.deepEqual(evidence, baseline.result);
+            assert.deepEqual(calls, baseline.calls);
+            assert.deepEqual(promotionAssessment, {
+                declaredEdge,
+                direction: 'source-to-target',
+                basis: 'exact-source-commit-ancestry',
+                status,
+                policySource: 'caller-declared',
+            });
+            assert.doesNotMatch(JSON.stringify(result), /PRIVATE/u);
+        }
+    }
+    for (const declaredEdge of ['promotion', 'back-promotion']) {
+        const { result, calls } = mocked([], () =>
+            inspectProjectGitRange(root, '--help', 'main', declaredEdge)
+        );
+        assert.deepEqual(calls, []);
+        assert.equal(result.promotionAssessment.status, 'unknown');
+        assert.deepEqual(result.findings, ['invalid-ref']);
+        assert.equal(
+            inspectProjectGitRange(root, 'main', 'refs/heads/main', declaredEdge)
+                .promotionAssessment.status,
+            'unknown'
+        );
+    }
+});
+
+test('invalid declared intent fails before config or subprocess access without echoing input', () => {
+    for (const value of [null, '', 'reverse', 'PRIVATE', 1, true, [], { PRIVATE: true }]) {
+        mocked([], () => {
+            assert.throws(() => inspectProjectGitRange('relative', 'main', 'other', value), {
+                name: 'TypeError',
+                message: 'Invalid declared edge.',
+            });
+        });
+    }
+});
+
 test('unsafe roots fail before subprocess inspection', () => {
     assert.throws(() => inspectProjectGitRange('relative', 'main', 'other'), {
         code: 'unsafe-path',

@@ -11,6 +11,13 @@ export interface ProjectGitRange {
     remoteBuSynchronization: 'unknown';
     findings: string[];
     limitations: string[];
+    promotionAssessment?: {
+        declaredEdge: 'promotion' | 'back-promotion';
+        direction: 'source-to-target';
+        basis: 'exact-source-commit-ancestry';
+        status: 'contained' | 'not-contained' | 'unknown';
+        policySource: 'caller-declared';
+    };
 }
 
 // Deliberately narrower than Git: ASCII branch components or fully qualified refs only.
@@ -37,13 +44,21 @@ function safeRef(value: string): boolean {
  * @param projectRoot - Explicit canonical absolute project root accepted by readProjectConfig.
  * @param sourceRef - Safe branch name or exact full ref, never a revision expression.
  * @param targetRef - Safe branch name or exact full ref, never a revision expression.
+ * @param declaredEdge - Optional caller intent; both kinds use the same source-to-target direction.
  * @returns {ProjectGitRange} Immutable endpoints and bounded local evidence, not deployment policy.
  */
 export function inspectProjectGitRange(
     projectRoot: string,
     sourceRef: string,
-    targetRef: string
+    targetRef: string,
+    declaredEdge?: 'promotion' | 'back-promotion'
 ): ProjectGitRange {
+    if (
+        declaredEdge !== undefined &&
+        declaredEdge !== 'promotion' &&
+        declaredEdge !== 'back-promotion'
+    )
+        throw new TypeError('Invalid declared edge.');
     const canonical = readProjectConfig(projectRoot).projectRoot;
     const valid = safeRef(sourceRef) && safeRef(targetRef);
     const result: ProjectGitRange = {
@@ -61,9 +76,26 @@ export function inspectProjectGitRange(
             'Dirty and detached status are not checked or prerequisites for read-only evidence.',
         ],
     };
+    const finish = (): ProjectGitRange => {
+        if (declaredEdge !== undefined) {
+            result.promotionAssessment = {
+                declaredEdge,
+                direction: 'source-to-target',
+                basis: 'exact-source-commit-ancestry',
+                status:
+                    result.ancestry === 'equal' || result.ancestry === 'target-ahead'
+                        ? 'contained'
+                        : result.ancestry === 'source-ahead' || result.ancestry === 'diverged'
+                          ? 'not-contained'
+                          : 'unknown',
+                policySource: 'caller-declared',
+            };
+        }
+        return result;
+    };
     if (!valid) {
         result.findings.push('invalid-ref');
-        return result;
+        return finish();
     }
     const env = Object.fromEntries(
         Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith('GIT_'))
@@ -134,11 +166,11 @@ export function inspectProjectGitRange(
     const target = result.target.commit;
     if (!source || !target) {
         result.findings.push('endpoint-unverified');
-        return result;
+        return finish();
     }
     if (source === target) {
         result.ancestry = 'equal';
-        return result;
+        return finish();
     }
     const sourceContainsTarget = run(['merge-base', '--is-ancestor', target, source]);
     const targetContainsSource = run(['merge-base', '--is-ancestor', source, target]);
@@ -169,5 +201,5 @@ export function inspectProjectGitRange(
             result.ancestry = 'diverged';
         } else result.findings.push('ancestry-unverified');
     } else result.findings.push('ancestry-unverified');
-    return result;
+    return finish();
 }

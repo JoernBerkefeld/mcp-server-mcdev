@@ -3,12 +3,17 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { readProjectConfig } from './project-inspection.js';
 import { QUERY_RETRIEVE_CONTRACT } from './query-retrieve-contract.js';
+import { SCRIPT_RETRIEVE_CONTRACT } from './script-retrieve-contract.js';
+
+/** Closed internal distinction; omitted metadataType preserves historical query bindings. */
+export type RetrieveMetadataType = 'query' | 'script';
 
 export interface QueryProjectSelection {
     readonly projectRoot: string;
     readonly credential: string;
     readonly businessUnit: string;
     readonly key: string;
+    readonly metadataType?: RetrieveMetadataType;
 }
 
 export interface QueryProjectSnapshot extends QueryProjectSelection {
@@ -42,6 +47,10 @@ function ownRecord(parent: Record<string, unknown>, key: string): Record<string,
 export function collectQueryProjectSnapshot(input: QueryProjectSelection): QueryProjectSnapshot {
     try {
         const { projectRoot, credential, businessUnit, key } = input;
+        const metadataType = input.metadataType === undefined ? 'query' : input.metadataType;
+        if (metadataType !== 'query' && metadataType !== 'script') {
+            throw new QueryProjectSnapshotError();
+        }
         const literal = /^[A-Za-z0-9][A-Za-z0-9_. -]*$/u;
         if (
             typeof projectRoot !== 'string' ||
@@ -79,7 +88,8 @@ export function collectQueryProjectSnapshot(input: QueryProjectSelection): Query
             mid,
             key,
             configTextHash: createHash('sha256').update(project.rawText, 'utf8').digest('hex'),
-            contract: QUERY_RETRIEVE_CONTRACT,
+            // Keep the legacy query hash basis byte-for-byte; script binds its own reviewed facts.
+            contract: metadataType === 'query' ? QUERY_RETRIEVE_CONTRACT : SCRIPT_RETRIEVE_CONTRACT,
         };
         return Object.freeze({
             projectRoot: project.projectRoot,
@@ -87,6 +97,7 @@ export function collectQueryProjectSnapshot(input: QueryProjectSelection): Query
             businessUnit,
             mid,
             key,
+            ...(metadataType === 'script' ? { metadataType } : {}),
             snapshot: createHash('sha256').update(JSON.stringify(identity), 'utf8').digest('hex'),
         });
     } catch {
