@@ -28,13 +28,39 @@ const input = () => ({
 async function fixture(
     t,
     handler,
-    { capabilities = { elicitation: { form: {} } }, timeoutMs = 1000, warmUp = false } = {}
+    {
+        capabilities = { elicitation: { form: {} } },
+        timeoutMs = 1000,
+        warmUp = false,
+        observeBudget = () => {},
+        beforeConfirm = () => {},
+    } = {}
 ) {
     const server = new McpServer({ name: 'confirmation-test-only', version: '0' });
     const client = new Client({ name: 'confirmation-client', version: '0' }, { capabilities });
     const frames = [];
     const completed = [];
+    const deliveries = [];
+    const observers = new Set();
+    const completion = Promise.withResolvers();
+    const delivered = (predicate) => {
+        const existing = deliveries.find(predicate);
+        if (existing) return Promise.resolve(existing);
+        return new Promise((resolve) => {
+            const observe = (frame) => {
+                if (!predicate(frame)) return;
+                observers.delete(observe);
+                resolve(frame);
+            };
+            observers.add(observe);
+        });
+    };
     let executions = 0;
+    const elicitInput = server.server.elicitInput.bind(server.server);
+    t.mock.method(server.server, 'elicitInput', (request, options) => {
+        observeBudget(options);
+        return elicitInput(request, options);
+    });
     server.registerTool('test_confirmation', { inputSchema: {} }, async (_args, extra) => {
         const gate = createQueryRetrieveConfirmation(input(), {
             signal: extra.signal,
@@ -45,8 +71,10 @@ async function fixture(
                 executions++;
             },
         });
+        beforeConfirm();
         const value = await gate.confirm();
         completed.push(value);
+        completion.resolve(value);
         return { content: [{ type: 'text', text: JSON.stringify(value) }] };
     });
     if (handler) client.setRequestHandler(ElicitRequestSchema, handler);
@@ -58,8 +86,11 @@ async function fixture(
     ]) {
         const send = transport.send.bind(transport);
         transport.send = async (message, options) => {
-            frames.push({ side, message, options });
-            return send(message, options);
+            const frame = { side, message, options };
+            frames.push(frame);
+            await send(message, options);
+            deliveries.push(frame);
+            for (const observe of observers) observe(frame);
         };
     }
     t.after(async () => {
@@ -70,7 +101,14 @@ async function fixture(
     await client.connect(clientTransport);
     // Opt in only when exercising the SDK's nonzero-ID cancellation propagation.
     if (warmUp) await server.server.ping();
-    return { client, frames, completed, executions: () => executions };
+    return {
+        client,
+        frames,
+        completed,
+        completion: completion.promise,
+        delivered,
+        executions: () => executions,
+    };
 }
 async function call(client, options) {
     const response = await client.callTool(
@@ -159,123 +197,115 @@ test('SDK client error remains fixed failed diagnostic', async (t) => {
     assert.equal(f.executions(), 0);
 });
 
-for (const cancelled of [false, true]) {
-    test(
-        `SDK ${cancelled ? 'incoming cancellation' : 'deadline'} cancels pending elicitation and rejects late acceptance`,
-        { timeout: 2000 },
-        async (t) => {
-            let release;
-            let entered;
-            let stopped;
-            const waiting = new Promise((resolve) => {
-                entered = resolve;
+async function terminalRace(t, { mode, warmUp }) {
+    const cancelled = mode === 'cancel';
+    const sdkFirst = mode === 'sdk-first';
+    const waiting = Promise.withResolvers();
+    const handlerReturned = Promise.withResolvers();
+    let release;
+    let handlerSignal;
+    let forwardedBudget;
+    let dateReads = 0;
+    const durations = [];
+    const f = await fixture(
+        t,
+        (request, extra) => {
+            handlerSignal = extra.signal;
+            return new Promise((resolve) => {
+                release = () => resolve(accepted(request));
+                waiting.resolve();
+            }).then((response) => {
+                handlerReturned.resolve();
+                return response;
             });
-            const cancellation = new Promise((resolve) => {
-                stopped = resolve;
-            });
-            const f = await fixture(
-                t,
-                (request, extra) =>
-                    new Promise((resolve) => {
-                        extra.signal.addEventListener('abort', stopped, { once: true });
-                        release = () => resolve(accepted(request));
-                        entered();
-                    }),
-                { timeoutMs: cancelled ? 1000 : 50, warmUp: true }
-            );
-            const controller = new AbortController();
-            const pending = call(f.client, { signal: controller.signal });
-            // Attach rejection handling before aborting the actual SDK tools/call.
-            const rejected = cancelled ? assert.rejects(pending) : undefined;
-            await waiting;
-            if (cancelled) controller.abort('SENSITIVE-parent-reason');
-            else assert.equal((await pending).outcome, 'timeout');
-            await cancellation;
-            if (rejected) await rejected;
-            await new Promise((resolve) => setImmediate(resolve));
-            assert.equal(f.completed[0].outcome, cancelled ? 'cancel' : 'timeout');
-            const elicitation = f.frames.find(
-                ({ message }) => message.method === 'elicitation/create'
-            );
-            const notification = f.frames.find(
-                ({ side, message }) =>
-                    side === 'server' && message.method === 'notifications/cancelled'
-            );
-            assert.equal(notification.message.params.requestId, elicitation.message.id);
-            // The SDK's bounded timer may win the same deadline race under suite load.
-            // Both paths cancel the exact request; parent cancellation has one fixed reason.
-            if (cancelled)
-                assert.equal(notification.message.params.reason, 'query_confirmation_stopped');
-            else
-                assert.ok(
-                    [
-                        'query_confirmation_stopped',
-                        'McpError: MCP error -32001: Request timed out',
-                    ].includes(notification.message.params.reason)
-                );
-            release();
-            await new Promise((resolve) => setImmediate(resolve));
-            assert.equal(f.completed.length, 1);
-            assert.equal(f.executions(), 0);
+        },
+        {
+            timeoutMs: 50,
+            warmUp,
+            observeBudget: (options) => {
+                forwardedBudget = options.timeout;
+                assert.equal(options.maxTotalTimeout, forwardedBudget);
+            },
+            beforeConfirm: () => {
+                // Incoming-request entry sets the independent deadline baseline.
+                // Budget calculation precedes the SDK adapter wrapper.
+                const schedule = globalThis.setTimeout;
+                t.mock.method(globalThis, 'setTimeout', (callback, duration, ...args) => {
+                    durations.push(duration);
+                    return schedule(callback, duration, ...args);
+                });
+                t.mock.method(Date, 'now', () => 1000 + (sdkFirst && dateReads++ > 0 ? 1 : 0));
+            },
         }
     );
+    const controller = new AbortController();
+    // Install after connection handshake but before the outer SDK request creates
+    // its timer, so teardown cannot strand a real timer behind mock clearTimeout.
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1000 });
+    try {
+        const pending = call(f.client, { signal: controller.signal });
+        const rejected = cancelled ? assert.rejects(pending) : undefined;
+        await waiting.promise;
+        assert.equal(durations[0], 50);
+        assert.equal(forwardedBudget, sdkFirst ? 49 : 50);
+        assert.deepEqual(durations, [50, forwardedBudget]);
+        const elicitation = f.frames.find(({ message }) => message.method === 'elicitation/create');
+        if (!warmUp) assert.equal(elicitation.message.id, 0);
+        if (cancelled) {
+            controller.abort('SENSITIVE-parent-reason');
+            await rejected;
+        } else {
+            // The timer clock has not moved during independent Date.now budget reads.
+            t.mock.timers.tick(sdkFirst ? 49 : 50);
+            assert.equal((await pending).outcome, 'timeout');
+        }
+        const notification = await f.delivered(
+            ({ side, message }) => side === 'server' && message.method === 'notifications/cancelled'
+        );
+        assert.equal(notification.message.params.requestId, elicitation.message.id);
+        assert.equal(
+            notification.message.params.reason,
+            sdkFirst
+                ? 'McpError: MCP error -32001: Request timed out'
+                : 'query_confirmation_stopped'
+        );
+        const terminal = await f.completion;
+        assert.equal(handlerSignal.aborted, warmUp);
+        assert.equal(f.completed.length, 1);
+        assert.equal(terminal.outcome, cancelled ? 'cancel' : 'timeout');
+        assert.equal(terminal.executionEnabled, false);
+        assert.ok(Object.isFrozen(terminal));
+        release();
+        // Wait for the real SDK handler's response to be delivered, rather than
+        // assuming a single setImmediate happens after its promise chain.
+        await handlerReturned.promise;
+        if (!warmUp) {
+            await f.delivered(
+                ({ side, message }) =>
+                    side === 'client' &&
+                    message.id === elicitation.message.id &&
+                    ('result' in message || 'error' in message)
+            );
+        }
+        // Aborted nonzero handlers deliberately suppress SDK response delivery.
+        assert.equal(f.completed.length, 1);
+        assert.equal(f.completed[0], terminal);
+        assert.equal(f.executions(), 0);
+    } finally {
+        release?.();
+        t.mock.restoreAll();
+        t.mock.timers.reset();
+    }
 }
-for (const cancelled of [false, true]) {
-    test(
-        `SDK ID0 ${cancelled ? 'cancel' : 'timeout'} is gate-terminal despite unpropagated handler cancellation`,
-        { timeout: 2000 },
-        async (t) => {
-            let release;
-            let handlerSignal;
-            let entered;
-            const waiting = new Promise((resolve) => {
-                entered = resolve;
-            });
-            const f = await fixture(
-                t,
-                (request, extra) =>
-                    new Promise((resolve) => {
-                        handlerSignal = extra.signal;
-                        release = () => resolve(accepted(request));
-                        entered();
-                    }),
-                { timeoutMs: cancelled ? 500 : 50 }
-            );
-            t.after(() => release?.());
-            const controller = new AbortController();
-            const pending = call(f.client, { signal: controller.signal });
-            const rejected = cancelled ? assert.rejects(pending) : undefined;
-            await waiting;
-            const elicitation = f.frames.find(
-                ({ message }) => message.method === 'elicitation/create'
-            );
-            assert.equal(elicitation.message.id, 0);
-            if (cancelled) {
-                controller.abort('SENSITIVE-parent-reason');
-                await rejected;
-            } else {
-                assert.equal((await pending).outcome, 'timeout');
-            }
-            // Drain delivery without waiting on the SDK's broken ID0 abort signal.
-            await new Promise((resolve) => setImmediate(resolve));
-            const notification = f.frames.find(
-                ({ side, message }) =>
-                    side === 'server' && message.method === 'notifications/cancelled'
-            );
-            assert.equal(notification.message.params.requestId, 0);
-            assert.equal(notification.message.params.reason, 'query_confirmation_stopped');
-            assert.equal(handlerSignal.aborted, false);
-            assert.equal(f.completed.length, 1);
-            const terminal = f.completed[0];
-            assert.equal(terminal.outcome, cancelled ? 'cancel' : 'timeout');
-            assert.equal(terminal.executionEnabled, false);
-            release();
-            await new Promise((resolve) => setImmediate(resolve));
-            assert.equal(f.completed.length, 1);
-            assert.equal(f.completed[0], terminal);
-            assert.equal(f.executions(), 0);
-        }
-    );
+
+for (const warmUp of [true, false]) {
+    for (const mode of ['gate-first', 'sdk-first', 'cancel']) {
+        test(
+            `SDK ${warmUp ? 'nonzero ID' : 'ID0'} ${mode} is terminal and rejects late acceptance`,
+            { timeout: 2000, concurrency: false },
+            (t) => terminalRace(t, { mode, warmUp })
+        );
+    }
 }
 
 test('concurrent SDK calls cannot exchange operation confirmation correlations', async (t) => {
