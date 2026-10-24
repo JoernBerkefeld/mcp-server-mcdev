@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
 import {
     createQueryRetrieveConfirmation,
@@ -9,7 +10,7 @@ import {
 } from '../dist/query-retrieve-confirmation.js';
 
 const input = () => ({
-    projectRoot: String.raw`C:\synthetic\invented-project`,
+    projectRoot: path.resolve('synthetic', 'invented-project'),
     credential: 'demo',
     businessUnit: 'QA',
     mid: '123',
@@ -194,6 +195,49 @@ test('unknown auth-bearing exceptions produce fixed diagnostics only', async () 
             executionEnabled: false,
             consentBasis: 'trusted-client-assertion-not-independent-human-attestation',
         });
+    }
+});
+
+test('all confirmation boundaries accept native roots and reject unsafe spelling before callbacks', async () => {
+    const projectRoot = path.resolve('synthetic', 'invented-project');
+    for (const create of [
+        createQueryRetrieveConfirmation,
+        createQueryRetrieveApproval,
+        createSyntheticQueryConfirmation,
+    ]) {
+        let callbacks = 0;
+        const dependencies = {
+            signal: new AbortController().signal,
+            elicit: async () => {
+                callbacks++;
+                return { action: 'decline' };
+            },
+            recheck: async () => {
+                throw new Error('must not recheck');
+            },
+            execute: async () => {
+                throw new Error('must not execute');
+            },
+        };
+        const inspected = { ...input(), projectRoot, effects: ['Exact prepared effects'] };
+        for (const unsafe of [
+            'relative',
+            `${projectRoot}${path.sep}..${path.sep}escape`,
+            `${projectRoot}${path.sep}.${path.sep}child`,
+            `${projectRoot}${path.sep}${path.sep}child`,
+            String.raw`\\host\share\project`,
+            '//host/share/project',
+        ]) {
+            assert.throws(
+                () => create({ ...inspected, projectRoot: unsafe }, dependencies),
+                /Invalid inspected query operation/
+            );
+        }
+        assert.equal(callbacks, 0);
+        const gate = create(inspected, dependencies);
+        assert.equal(gate.operation.projectRoot, projectRoot);
+        assert.equal((await gate.confirm()).outcome, 'decline');
+        assert.equal(callbacks, 1);
     }
 });
 

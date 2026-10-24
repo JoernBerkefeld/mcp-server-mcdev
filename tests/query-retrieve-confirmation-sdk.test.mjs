@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,7 +18,7 @@ const accepted = (request) => ({
     },
 });
 const input = () => ({
-    projectRoot: String.raw`C:\synthetic\invented-project`,
+    projectRoot: path.resolve('synthetic', 'invented-project'),
     credential: 'demo',
     businessUnit: 'QA',
     mid: '123',

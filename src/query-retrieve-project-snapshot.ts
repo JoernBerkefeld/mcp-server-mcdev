@@ -1,6 +1,6 @@
 /** Config-only binding; no artifact, authentication, remote identity or execution readiness proof. */
 import { createHash } from 'node:crypto';
-import path from 'node:path';
+import { isCanonicalProjectRootPath } from './project-root-path.js';
 import { readProjectConfig } from './project-inspection.js';
 import { QUERY_RETRIEVE_CONTRACT } from './query-retrieve-contract.js';
 import { SCRIPT_RETRIEVE_CONTRACT } from './script-retrieve-contract.js';
@@ -53,10 +53,7 @@ export function collectQueryProjectSnapshot(input: QueryProjectSelection): Query
         }
         const literal = /^[A-Za-z0-9][A-Za-z0-9_. -]*$/u;
         if (
-            typeof projectRoot !== 'string' ||
-            !path.win32.isAbsolute(projectRoot) ||
-            path.win32.normalize(projectRoot) !== projectRoot ||
-            projectRoot.startsWith('\\\\') ||
+            !isCanonicalProjectRootPath(projectRoot) ||
             [credential, businessUnit, key].some(
                 (value) =>
                     typeof value !== 'string' ||

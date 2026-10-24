@@ -12,6 +12,7 @@ import {
     QueryProjectSnapshotError,
 } from '../dist/query-retrieve-project-snapshot.js';
 import { createQueryRetrieveConfirmation } from '../dist/query-retrieve-confirmation.js';
+import { isCanonicalProjectRootPath } from '../dist/project-root-path.js';
 
 validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
@@ -42,6 +43,37 @@ function rejects(input) {
             error.message === 'Query project configuration snapshot unavailable.'
     );
 }
+
+test('project-root spelling follows native rules and explicit POSIX/Windows dialects', () => {
+    assert.equal(isCanonicalProjectRootPath(path.resolve('synthetic-project')), true);
+    for (const [pathApi, canonical, invalid] of [
+        [
+            path.posix,
+            '/tmp/invented-project',
+            ['relative', '/tmp/../project', '/tmp/./project', '/tmp//project', '//host/share'],
+        ],
+        [
+            path.win32,
+            String.raw`C:\synthetic\invented-project`,
+            [
+                'relative',
+                String.raw`C:project`,
+                String.raw`C:\synthetic\..\project`,
+                String.raw`C:\synthetic\.\project`,
+                'C:/synthetic/project',
+                String.raw`\\host\share\project`,
+                String.raw`\\?\C:\project`,
+            ],
+        ],
+    ]) {
+        assert.equal(isCanonicalProjectRootPath(canonical, pathApi), true);
+        for (const value of [...invalid, '', null, 1, {}]) {
+            assert.equal(isCanonicalProjectRootPath(value, pathApi), false);
+        }
+    }
+    assert.notEqual(path.win32.normalize('/tmp/invented-project'), '/tmp/invented-project');
+    assert.equal(isCanonicalProjectRootPath('/tmp/invented-project', path.posix), true);
+});
 
 test('real config accessor derives exact qualified MID and immutable gate-compatible input', async () => {
     const input = fixture();
