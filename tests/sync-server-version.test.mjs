@@ -7,6 +7,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { syncServerVersions } from '../scripts/sync-server-version.mjs';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 
 const pkg = {
     name: 'mcp-server-mcdev',
@@ -60,20 +61,7 @@ function git(cwd, ...args) {
  * @returns {string} Fixture repository path.
  */
 function fixture(t, malformed = false) {
-    const normalize = (value) =>
-        path
-            .resolve(value)
-            .replaceAll(/[/\\]+$/gu, '')
-            .toLowerCase();
-    if (process.platform === 'win32') {
-        for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-            if (value) {
-                assert.ok(path.isAbsolute(value));
-                assert.equal(normalize(value), String.raw`f:\temp`);
-            }
-        }
-        assert.ok(process.env.TEMP);
-    }
+    validateTempEnvironment();
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-version-'));
     const cwd = path.join(root, 'repo');
     fs.mkdirSync(cwd);

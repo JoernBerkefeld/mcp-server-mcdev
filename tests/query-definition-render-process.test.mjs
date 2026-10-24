@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,22 +10,7 @@ import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { runQueryDefinitionRenderProcess } from '../dist/query-definition-render-process.js';
 
-for (const [name, value] of Object.entries({
-    TEMP: process.env.TEMP,
-    NODE: os.tmpdir(),
-    TMP: process.env.TMP,
-    TMPDIR: process.env.TMPDIR,
-})) {
-    if (name !== 'TEMP' && name !== 'NODE' && !value) continue;
-    assert.ok(value && path.win32.isAbsolute(value));
-    assert.equal(
-        path.win32
-            .normalize(value)
-            .replace(/[\\/]+$/u, '')
-            .toLowerCase(),
-        String.raw`f:\temp`
-    );
-}
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-render-process-'))
 );

@@ -9,7 +9,7 @@ import {
 } from '../dist/query-retrieve-confirmation.js';
 
 const input = () => ({
-    projectRoot: String.raw`F:\Temp\invented-project`,
+    projectRoot: String.raw`C:\synthetic\invented-project`,
     credential: 'demo',
     businessUnit: 'QA',
     mid: '123',

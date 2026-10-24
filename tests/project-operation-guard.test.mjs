@@ -11,7 +11,7 @@ import {
 } from '../dist/project-operation-guard.js';
 
 // Synthetic identities only: these lifecycle tests perform no filesystem operations.
-const project = () => path.join(String.raw`F:\Temp`, `mcdev-guard-${randomUUID()}`);
+const project = () => path.resolve(`synthetic-guard-${randomUUID()}`);
 
 test('idle/running lifecycle case-folds roots and never reconciles a running operation', () => {
     const root = project();

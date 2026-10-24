@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,18 +10,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { previewProjectCommand } from '../dist/project-command-preview.js';
 
-assert.ok(process.env.TEMP);
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (!value) continue;
-    assert.ok(path.isAbsolute(value));
-    assert.equal(
-        path
-            .resolve(value)
-            .replaceAll(/[\\/]+$/gu, '')
-            .toLowerCase(),
-        path.normalize('F:/Temp').toLowerCase()
-    );
-}
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-project-preview-tools-'))
 );

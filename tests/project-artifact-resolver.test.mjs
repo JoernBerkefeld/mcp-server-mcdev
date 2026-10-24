@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,19 +11,7 @@ import {
     resolveProjectArtifact,
 } from '../dist/project-artifact-resolver.js';
 
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (value) {
-        assert.ok(path.isAbsolute(value));
-        assert.equal(
-            path
-                .normalize(value)
-                .replace(/[\\/]+$/u, '')
-                .toLowerCase(),
-            String.raw`f:\temp`
-        );
-    }
-}
-assert.ok(process.env.TEMP);
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-resolver-')));
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain owned fixtures, never recursively delete.

@@ -1,6 +1,6 @@
 /** Internal supervised transport, not authorization or proof of artifact completeness. */
 import fs from 'node:fs';
-import os from 'node:os';
+import { createNativeEnvironment } from './temp-environment.js';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -72,49 +72,6 @@ function canonical(candidate: string, directory: boolean): void {
     }
 }
 
-function environment(): NodeJS.ProcessEnv {
-    for (const [name, value] of Object.entries({
-        TEMP: process.env.TEMP,
-        NODE: os.tmpdir(),
-        TMP: process.env.TMP,
-        TMPDIR: process.env.TMPDIR,
-    })) {
-        if (name !== 'TEMP' && name !== 'NODE' && !value) continue;
-        if (
-            !value ||
-            !path.win32.isAbsolute(value) ||
-            path.win32
-                .normalize(value)
-                .replace(/[\\/]+$/u, '')
-                .toLowerCase() !== String.raw`f:\temp`
-        ) {
-            throw new Error('Invalid temporary environment');
-        }
-    }
-    // Explicit allowlist excludes Node injection, proxy/preload and arbitrary caller environment.
-    const allowed = new Set([
-        'systemroot',
-        'windir',
-        'path',
-        'pathext',
-        'temp',
-        'tmp',
-        'tmpdir',
-        'userprofile',
-        'appdata',
-        'localappdata',
-        'programdata',
-        'homedrive',
-        'homepath',
-    ]);
-    const env: NodeJS.ProcessEnv = {};
-    for (const [name, value] of Object.entries(process.env)) {
-        if (allowed.has(name.toLowerCase())) env[name.toUpperCase()] = value;
-    }
-    env.NO_COLOR = '1';
-    return env;
-}
-
 /**
  * Launch one supervised process. Caller owns authorization, fixed argv, recheck and serialization.
  * Runtime selection is internal; tests substitute a synthetic package/CLI, never real account commands.
@@ -179,7 +136,7 @@ export async function runNativeProcess(
             manifest.bin?.mcdev !== 'lib/cli.js'
         )
             throw new Error('Unsupported CLI');
-        env = environment();
+        env = createNativeEnvironment();
     } catch {
         return result('invalid-input');
     }

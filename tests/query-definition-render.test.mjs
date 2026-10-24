@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,18 +16,7 @@ import {
 import * as guard from '../dist/project-operation-guard.js';
 import { createQueryRetrieveCoordinator } from '../dist/query-retrieve-integration.js';
 
-assert.ok(process.env.TEMP);
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (!value) continue;
-    assert.ok(path.isAbsolute(value));
-    assert.equal(
-        path
-            .resolve(value)
-            .replace(/[\\/]+$/u, '')
-            .toLowerCase(),
-        String.raw`f:\temp`
-    );
-}
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-render-prepare-'))
 );

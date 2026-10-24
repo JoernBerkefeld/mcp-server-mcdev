@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import childProcess from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -8,18 +9,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { inspectProjectGitPolicy } from '../dist/project-git-policy.js';
 
-const normalize = (value) =>
-    path
-        .resolve(value)
-        .replace(/[\\/]+$/u, '')
-        .toLowerCase();
-assert.ok(process.env.TEMP);
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (value) {
-        assert.ok(path.isAbsolute(value));
-        assert.equal(normalize(value), normalize('F:/Temp'));
-    }
-}
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-git-policy-')));
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain owned fixtures; no recursive cleanup and no synthetic commits.

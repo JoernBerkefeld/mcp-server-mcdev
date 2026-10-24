@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -10,18 +11,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { inspectProjectGitPolicy } from '../dist/project-git-policy.js';
 
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (!value) continue;
-    assert.ok(path.isAbsolute(value), 'temporary paths must be absolute');
-    assert.equal(
-        path
-            .resolve(value)
-            .replaceAll(/[\\/]+$/gu, '')
-            .toLowerCase(),
-        path.normalize('F:/Temp').toLowerCase()
-    );
-}
-assert.ok(process.env.TEMP, 'TEMP must be set');
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-git-policy-tools-'))
 );

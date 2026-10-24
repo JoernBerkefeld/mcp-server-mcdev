@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -6,20 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { ProjectInspectionError, readProjectConfig } from '../dist/project-inspection.js';
 
-const expectedTemp = path.normalize('F:/Temp').toLowerCase();
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (value) {
-        assert.ok(path.isAbsolute(value), 'temporary paths must be absolute');
-        assert.equal(
-            path
-                .normalize(value)
-                .replace(/[\\/]+$/u, '')
-                .toLowerCase(),
-            expectedTemp
-        );
-    }
-}
-assert.ok(process.env.TEMP, 'TEMP must be set');
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-inspection-')));
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain every synthetic fixture: no cleanup or recursive deletion is performed.

@@ -9,19 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { inspectProjectGitRange } from '../dist/project-git-range.js';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 
-assert.ok(process.env.TEMP);
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (!value) continue;
-    assert.ok(path.isAbsolute(value));
-    assert.equal(
-        path
-            .resolve(value)
-            .replace(/[\\/]+$/u, '')
-            .toLowerCase(),
-        path.normalize('F:/Temp').toLowerCase()
-    );
-}
+validateTempEnvironment();
 const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-range-tools-')));
 fs.writeFileSync(path.join(root, '.owner'), randomUUID());
 fs.writeFileSync(path.join(root, '.mcdevrc.json'), '{}');

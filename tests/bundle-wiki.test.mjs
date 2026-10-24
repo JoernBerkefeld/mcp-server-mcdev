@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import { spawnSync } from 'node:child_process';
 import { randomUUID, createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -8,23 +9,7 @@ import { test } from 'node:test';
 import { bundleWiki, readSourceProvenance } from '../scripts/bundle-wiki.mjs';
 
 function fixture() {
-    const expected = path.resolve('F:/Temp').toLowerCase();
-    for (const [name, value] of Object.entries({
-        TEMP: process.env.TEMP,
-        node: os.tmpdir(),
-        TMP: process.env.TMP,
-        TMPDIR: process.env.TMPDIR,
-    })) {
-        if (!value && ['TMP', 'TMPDIR'].includes(name)) continue;
-        assert.ok(value && path.isAbsolute(value), `${name} must be absolute`);
-        assert.equal(
-            path
-                .resolve(value)
-                .replace(/[\\/]+$/, '')
-                .toLowerCase(),
-            expected
-        );
-    }
+    validateTempEnvironment();
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-wiki-provenance-'));
     fs.writeFileSync(path.join(root, '.run-owner'), randomUUID());
     const sourceDir = path.join(root, 'source');

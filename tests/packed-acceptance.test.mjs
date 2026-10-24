@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -45,25 +46,7 @@ test(
     'packed package acceptance without checkout module resolution',
     { timeout: 240_000 },
     async (t) => {
-        if (process.platform === 'win32') {
-            for (const value of [
-                process.env.TEMP,
-                os.tmpdir(),
-                process.env.TMP,
-                process.env.TMPDIR,
-            ]) {
-                if (value) {
-                    assert.ok(path.isAbsolute(value));
-                    assert.equal(
-                        path
-                            .resolve(value)
-                            .replaceAll(/[/\\]+$/g, '')
-                            .toLowerCase(),
-                        String.raw`f:\temp`
-                    );
-                }
-            }
-        }
+        validateTempEnvironment();
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-packed-acceptance-'));
         const archive = path.join(root, 'archive');
         const fixture = path.join(root, 'consumer');

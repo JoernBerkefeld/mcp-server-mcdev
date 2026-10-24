@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import childProcess from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -8,18 +9,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { inspectProjectGitRange } from '../dist/project-git-range.js';
 
-const normalize = (value) =>
-    path
-        .resolve(value)
-        .replace(/[\\/]+$/u, '')
-        .toLowerCase();
-assert.ok(process.env.TEMP);
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (value) {
-        assert.ok(path.isAbsolute(value));
-        assert.equal(normalize(value), normalize('F:/Temp'));
-    }
-}
+validateTempEnvironment();
 const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-git-range-')));
 fs.writeFileSync(path.join(root, '.owner'), randomUUID());
 fs.writeFileSync(path.join(root, '.mcdevrc.json'), '{}');

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment, createNativeEnvironment } from '../dist/temp-environment.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,22 +11,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { runQueryRetrieveProcess } from '../dist/query-retrieve-process.js';
 import { QUERY_RETRIEVE_CONTRACT } from '../dist/query-retrieve-contract.js';
 
-for (const [name, value] of Object.entries({
-    TEMP: process.env.TEMP,
-    NODE: os.tmpdir(),
-    TMP: process.env.TMP,
-    TMPDIR: process.env.TMPDIR,
-})) {
-    if (name !== 'TEMP' && name !== 'NODE' && !value) continue;
-    assert.ok(value && path.win32.isAbsolute(value));
-    assert.equal(
-        path.win32
-            .normalize(value)
-            .replace(/[\\/]+$/u, '')
-            .toLowerCase(),
-        String.raw`f:\temp`
-    );
-}
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-query-process-'))
 );
@@ -197,15 +183,11 @@ test('Script uses the same environment, timeout, cancellation and output bounds'
 test('Script rejects unsafe environment and selector before starting a process', async () => {
     const f = fixture();
     f.input.metadataType = 'script';
-    const previous = process.env.TMPDIR;
-    try {
-        process.env.TMPDIR = 'relative-not-temp';
-        assert.equal((await run(f)).outcome, 'invalid-input');
-        assert.equal(fs.existsSync(path.join(f.input.projectRoot, 'observed.json')), false);
-    } finally {
-        if (previous === undefined) delete process.env.TMPDIR;
-        else process.env.TMPDIR = previous;
-    }
+    assert.throws(
+        () => createNativeEnvironment({ ...process.env, TMPDIR: 'relative-not-temp' }),
+        /Invalid temporary environment/u
+    );
+    assert.equal(fs.existsSync(path.join(f.input.projectRoot, 'observed.json')), false);
     f.input.key = '../outside';
     assert.equal((await run(f)).outcome, 'invalid-input');
     assert.equal(fs.existsSync(path.join(f.input.projectRoot, 'observed.json')), false);
@@ -228,7 +210,9 @@ test('explicit environment excludes case-insensitive injection and arbitrary sec
         for (const name of Object.keys(env))
             assert.ok(!names.some((blocked) => blocked.toLowerCase() === name.toLowerCase()));
         assert.equal(env.NO_COLOR, '1');
-        assert.equal(env.TEMP.toLowerCase().replace(/[\\/]+$/u, ''), String.raw`f:\temp`);
+        for (const name of ['TEMP', 'TMP', 'TMPDIR']) {
+            assert.equal(env[name], process.env[name]);
+        }
     } finally {
         for (const [index, name] of names.entries()) {
             if (old[index] === undefined) delete process.env[name];
@@ -284,7 +268,7 @@ test('invalid lifetime, relative cwd and unsupported package identity fail close
         'relative',
         'F:relative',
         String.raw`\\server\share`,
-        String.raw`F:\Temp\..\Temp`,
+        String.raw`C:\scratch\..\scratch`,
     ]) {
         const f = fixture();
         f.input.projectRoot = projectRoot;

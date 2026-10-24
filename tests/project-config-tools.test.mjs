@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,18 +10,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { diagnoseProjectConfig } from '../dist/project-config-diagnostics.js';
 
-for (const value of [process.env.TEMP, os.tmpdir(), process.env.TMP, process.env.TMPDIR]) {
-    if (!value) continue;
-    assert.ok(path.isAbsolute(value), 'temporary paths must be absolute');
-    assert.equal(
-        path
-            .resolve(value)
-            .replaceAll(/[\\/]+$/gu, '')
-            .toLowerCase(),
-        path.normalize('F:/Temp').toLowerCase()
-    );
-}
-assert.ok(process.env.TEMP, 'TEMP must be set');
+validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-config-tools-'))
 );

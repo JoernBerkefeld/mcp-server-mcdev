@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateTempEnvironment } from '../dist/temp-environment.js';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -14,23 +15,7 @@ import {
 } from '../dist/doc-search.js';
 
 function fixture(markdown) {
-    const expected = path.resolve('F:/Temp').toLowerCase();
-    for (const [name, value] of Object.entries({
-        TEMP: process.env.TEMP,
-        node: os.tmpdir(),
-        TMP: process.env.TMP,
-        TMPDIR: process.env.TMPDIR,
-    })) {
-        if (!value && ['TMP', 'TMPDIR'].includes(name)) continue;
-        assert.ok(value && path.isAbsolute(value), `${name} must be absolute`);
-        assert.equal(
-            path
-                .resolve(value)
-                .replace(/[\\/]+$/, '')
-                .toLowerCase(),
-            expected
-        );
-    }
+    validateTempEnvironment();
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-doc-search-'));
     fs.writeFileSync(path.join(root, '.run-owner'), randomUUID());
     fs.writeFileSync(path.join(root, 'Guide.md'), markdown);
