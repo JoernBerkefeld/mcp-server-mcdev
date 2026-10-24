@@ -15,6 +15,7 @@ import {
     createQueryRetrieveAcceptanceServer,
 } from '../scripts/query-retrieve-acceptance.mjs';
 
+const syntheticProjectRoot = path.resolve('synthetic-acceptance-project');
 const prepared = () => ({
     ...ACCEPTANCE_SELECTION,
     mid: '518005426',
@@ -54,6 +55,19 @@ async function call(client, args = {}) {
     const result = await client.callTool({ name: 'accept_fixed_query_retrieve', arguments: args });
     return JSON.parse(result.content[0].text);
 }
+
+test('synthetic coordinator root is native canonical while live QA selection stays fixed', () => {
+    assert.equal(path.isAbsolute(syntheticProjectRoot), true);
+    assert.equal(path.normalize(syntheticProjectRoot), syntheticProjectRoot);
+    assert.deepEqual(ACCEPTANCE_SELECTION, {
+        projectRoot: String.raw`F:\Git\ide-root\mcdev-ssjs-validation`,
+        credential: 'ssjs',
+        businessUnit: 'MCDEV_Training_QA',
+        key: 'ssjsg_is_q_1785491597439',
+    });
+    assert.equal(prepared().projectRoot, ACCEPTANCE_SELECTION.projectRoot);
+    assert.notEqual(syntheticProjectRoot, ACCEPTANCE_SELECTION.projectRoot);
+});
 
 test('import is inert, fixed tool has no selectors and production stays isolated', async (t) => {
     const f = await fixture(t, { prepare: prepared, checkDependency: () => false });
@@ -175,7 +189,10 @@ for (const action of ['decline', 'cancel', 'unsupported', 'drift']) {
                 checkDependency: () => true,
                 run: (value, incoming) => {
                     context = incoming;
-                    return coordinator.runConfirmedQueryRetrieve(value, incoming);
+                    return coordinator.runConfirmedQueryRetrieve(
+                        { ...value, projectRoot: syntheticProjectRoot },
+                        incoming
+                    );
                 },
             },
             action === 'drift' ? accept : () => ({ action }),
@@ -222,7 +239,10 @@ test('actual incoming cancellation stops genuine coordinator before launch', asy
             checkDependency: () => true,
             run: async (value, context) => {
                 incoming = context;
-                const result = await coordinator.runConfirmedQueryRetrieve(value, context);
+                const result = await coordinator.runConfirmedQueryRetrieve(
+                    { ...value, projectRoot: syntheticProjectRoot },
+                    context
+                );
                 finished(result);
                 return result;
             },
