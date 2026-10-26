@@ -1,10 +1,10 @@
 /** Internal process-local exclusion shared by native project operation coordinators. */
 const sessions = new Map<string, 'running' | 'blocked'>();
-const sessionKey = (root: string) => root.toLowerCase();
+const sessionKey = (root: string) => (process.platform === 'win32' ? root.toLowerCase() : root);
 
 /**
  * Acquire exclusion for an idle canonical project; callers validate canonical paths.
- * @param root - Canonical project root, compared case-insensitively.
+ * @param root - Canonical project root, case-folded on Windows only.
  * @returns {boolean} Whether this operation acquired the project.
  */
 export function tryAcquire(root: string): boolean {

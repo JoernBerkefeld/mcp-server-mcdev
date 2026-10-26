@@ -27,7 +27,7 @@ test('clone is an immutable version-pinned guidance record, not a new command or
     assert.equal(listCommands().flatMap((entry) => entry.aliases).length, 26);
     assert.deepEqual(lookupCommand('clone').aliases, []);
     assert.equal(lookupCommand('bt'), lookupCommand('buildTemplate'));
-    assert.equal(lookupCommand('clone').execution.status, 'guidance-only');
+    assert.equal(lookupCommand('clone').execution.status, 'partially-executable');
     assert.equal(effects.sourceReferences.length, 21);
     assert.ok(Object.isFrozen(effects));
     assert.ok(Object.isFrozen(effects.sourceReferences));

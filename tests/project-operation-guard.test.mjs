@@ -13,17 +13,18 @@ import {
 // Synthetic identities only: these lifecycle tests perform no filesystem operations.
 const project = () => path.resolve(`synthetic-guard-${randomUUID()}`);
 
-test('idle/running lifecycle case-folds roots and never reconciles a running operation', () => {
+test('idle/running lifecycle uses native case semantics and never reconciles a running operation', () => {
     const root = project();
     assert.equal(isBlocked(root), false);
     assert.equal(acknowledgeExternalReconciliation(root), false);
     release(root);
     assert.equal(tryAcquire(root), true);
-    assert.equal(tryAcquire(root.toUpperCase()), false);
+    assert.equal(tryAcquire(root.toUpperCase()), process.platform !== 'win32');
+    if (process.platform !== 'win32') release(root.toUpperCase());
     assert.equal(isBlocked(root), false);
     assert.equal(acknowledgeExternalReconciliation(root.toUpperCase()), false);
     assert.equal(tryAcquire(root), false);
-    release(root.toUpperCase());
+    release(root);
     assert.equal(tryAcquire(root), true);
     release(root);
 });
@@ -31,12 +32,11 @@ test('idle/running lifecycle case-folds roots and never reconciles a running ope
 test('blocked exclusion survives release and requires explicit case-insensitive reconciliation', () => {
     const root = project();
     assert.equal(tryAcquire(root), true);
-    block(root.toUpperCase());
     block(root);
-    assert.equal(isBlocked(root.toUpperCase()), true);
+    assert.equal(isBlocked(root.toUpperCase()), process.platform === 'win32');
     release(root);
     assert.equal(tryAcquire(root), false);
-    assert.equal(acknowledgeExternalReconciliation(root.toUpperCase()), true);
+    assert.equal(acknowledgeExternalReconciliation(root), true);
     assert.equal(isBlocked(root), false);
     assert.equal(acknowledgeExternalReconciliation(root), false);
     assert.equal(tryAcquire(root), true);

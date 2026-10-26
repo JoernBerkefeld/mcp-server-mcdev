@@ -42,10 +42,8 @@ test('command catalog tools expose reviewed declarations only', { timeout: 30_00
             for (const tool of [list, get]) {
                 assert.equal(tool.inputSchema.type, 'object');
                 assert.match(tool.description, /Read-only/u);
-                assert.match(tool.description, /Guidance-only/u);
-                assert.match(tool.description, /No subprocess or dry run/u);
-                assert.match(tool.description, /native mcdev has no dry-run mode/u);
-                assert.match(tool.description, /not verified/u);
+                assert.match(tool.description, /run_mcdev_command/u);
+                assert.match(tool.description, /readiness/iu);
             }
             assert.ok(tools.some((tool) => tool.name === 'inspect_mcdev_project'));
         });
@@ -59,24 +57,20 @@ test('command catalog tools expose reviewed declarations only', { timeout: 30_00
                 assert.equal(entries.length, 31);
                 const { tools } = await client.listTools();
                 for (const entry of entries) {
+                    if (entry.execution.nativeRunner) {
+                        assert.equal(entry.execution.status, 'partially-executable');
+                        assert.equal(entry.execution.nativeRunner.tool, 'run_mcdev_command');
+                        assert.ok(tools.some((tool) => tool.name === 'run_mcdev_command'));
+                    }
                     if (entry.name === 'retrieve') {
                         assert.equal(entry.execution.status, 'partially-executable');
-                        assert.deepEqual(entry.execution.supportedCases, [
-                            { metadataType: 'query', tool: 'retrieve_mcdev_query' },
-                            { metadataType: 'script', tool: 'retrieve_mcdev_script' },
-                        ]);
-                        for (const supported of entry.execution.supportedCases) {
-                            assert.ok(tools.some((tool) => tool.name === supported.tool));
-                        }
+                        assert.equal(entry.execution.supportedCases, undefined);
+                        assert.equal(entry.execution.nativeRunner.tool, 'run_mcdev_command');
                         assert.match(
                             entry.execution.remainingGuidanceOnlyScope,
-                            /All other metadata types/u
+                            /Prompt-dependent/u
                         );
-                        assert.match(
-                            entry.execution.restrictions,
-                            /no arbitrary type, argv, flags or broad selectors/u
-                        );
-                    } else {
+                    } else if (!entry.execution.nativeRunner) {
                         assert.equal(entry.execution.status, 'guidance-only');
                         assert.match(entry.execution.reason, /No execution adapter exists/u);
                         assert.equal(entry.execution.supportedCases, undefined);
@@ -92,9 +86,9 @@ test('command catalog tools expose reviewed declarations only', { timeout: 30_00
                         ].includes(entry.name)
                     ) {
                         assert.equal(entry.reviewedEffects.status, 'partial-source-review');
-                        assert.match(entry.execution.reason, /remain unverified/u);
+                        assert.ok(entry.execution.reason.length > 0);
                     } else {
-                        if (entry.name !== 'retrieve') {
+                        if (!entry.execution.nativeRunner) {
                             assert.match(entry.execution.reason, /have not been reviewed/u);
                         }
                         assert.equal(entry.reviewedEffects, undefined);

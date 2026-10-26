@@ -73,14 +73,11 @@ test(
                         (entry) => entry.name === 'preview_mcdev_project_config'
                     );
                     assert.ok(tool);
-                    assert.equal(tools.length, 22);
+                    assert.equal(tools.length, 20);
                     assert.deepEqual(
                         tools.map((entry) => entry.name).toSorted(),
                         [
                             'diagnose_mcdev_retrieve_logs',
-                            'prepare_mcdev_query_retrieve',
-                            'retrieve_mcdev_query',
-                            'retrieve_mcdev_script',
                             'mcdev_search_docs',
                             'mcdev_get_doc_section',
                             'mcdev_explain_config_key',
@@ -98,13 +95,10 @@ test(
                             'resolve_mcdev_project_artifact',
                             'read_mcdev_artifact_source',
                             'preview_mcdev_project_command',
-                            'render_mcdev_query_definition',
+                            'run_mcdev_command',
+                            'reconcile_mcdev_operation',
                         ].toSorted()
                     );
-                    assert.ok(tools.some((entry) => entry.name === 'retrieve_mcdev_script'));
-                    assert.ok(tools.some((entry) => entry.name === 'retrieve_mcdev_query'));
-                    assert.ok(!tools.some((entry) => entry.name === 'accept_fixed_query_retrieve'));
-                    assert.ok(tools.some((entry) => entry.name === 'prepare_mcdev_query_retrieve'));
                     assert.deepEqual(Object.keys(tool.inputSchema.properties), [
                         'workspaceRoot',
                         'proposedConfig',

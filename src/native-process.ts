@@ -8,15 +8,27 @@ import { fileURLToPath } from 'node:url';
 const OUTPUT_LIMIT = 1024 * 1024;
 const GRACE_MS = 1000;
 const MAX_TIMEOUT_MS = 120_000;
+const NATIVE_COMMAND_MAX_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
 type StopReason = 'cancelled' | 'timed-out' | 'output-limit';
 export interface NativeProcessInput {
     readonly projectRoot: string;
     readonly args: readonly string[];
+    /** Internal API-only selections omitted from the CLI argv by the command contract. */
+    readonly nativeChoices?: { readonly fixShared: string };
+}
+export interface NativeProcessProgress {
+    readonly stdoutBytes: number;
+    readonly stderrBytes: number;
 }
 export interface NativeProcessLifetime {
     readonly signal: AbortSignal;
     readonly timeoutMs?: number;
+    /** Opt in to long-running commands; default wrappers retain legacy evidence and limits. */
+    readonly nativeCommandMode?: boolean;
+    /** Synchronous observer; retention/redaction belongs to the caller, not this transport. */
+    readonly onOutput?: (stream: 'stdout' | 'stderr', chunk: Buffer) => void;
+    readonly onProgress?: (progress: Readonly<NativeProcessProgress>) => void;
 }
 /** Trusted internal executable selection only; never accept this from tool arguments. */
 export interface NativeProcessRuntime {
@@ -39,17 +51,17 @@ export interface NativeProcessEvidence {
 function canonical(candidate: string, directory: boolean): void {
     if (
         typeof candidate !== 'string' ||
+        candidate.includes('\0') ||
         !path.isAbsolute(candidate) ||
         candidate.startsWith('\\\\') ||
         path.normalize(candidate) !== candidate ||
         candidate
-            .split(/[\\/]/u)
+            .split(path.sep)
             .some((part, index) =>
-                index === 0 && /^[a-z]:$/iu.test(part)
+                index === 0 && process.platform === 'win32' && /^[a-z]:$/iu.test(part)
                     ? false
                     : part.toLowerCase() === '.mcdev-auth.json' ||
-                      /[ .:]$/u.test(part) ||
-                      part.includes(':')
+                      (process.platform === 'win32' && (/[ .:]$/u.test(part) || part.includes(':')))
             )
     )
         throw new Error('Invalid process path');
@@ -77,7 +89,7 @@ function canonical(candidate: string, directory: boolean): void {
  * Runtime selection is internal; tests substitute a synthetic package/CLI, never real account commands.
  * Paths must remain stable throughout launch; metadata checks are not a concurrent filesystem sandbox.
  * @param input - Canonical project and internally constructed command arguments after the CLI entry.
- * @param lifetime - Request cancellation and bounded timeout (default 30 seconds, maximum 120 seconds).
+ * @param lifetime - Legacy: 30s default/120s max; opt-in commands: 30m default/24h max, streamed output.
  * @param runtime - Trusted installed CLI selection; no public argv, environment or Node override.
  * @returns {Promise<NativeProcessEvidence>} Output-free process evidence, never verified artifact success.
  */
@@ -107,17 +119,38 @@ export async function runNativeProcess(
         });
     let cliEntry: string;
     let env: NodeJS.ProcessEnv;
-    const timeoutMs = lifetime?.timeoutMs ?? 30_000;
+    let bridgeEntry: string | undefined;
+    const generalMode = lifetime?.nativeCommandMode === true;
+    const timeoutMs = lifetime?.timeoutMs ?? (generalMode ? 30 * 60 * 1000 : 30_000);
     try {
         if (
             !Number.isSafeInteger(timeoutMs) ||
             timeoutMs <= 0 ||
-            timeoutMs > MAX_TIMEOUT_MS ||
-            !(lifetime.signal instanceof AbortSignal)
+            timeoutMs > (generalMode ? NATIVE_COMMAND_MAX_TIMEOUT_MS : MAX_TIMEOUT_MS) ||
+            !(lifetime.signal instanceof AbortSignal) ||
+            (lifetime.nativeCommandMode !== undefined &&
+                typeof lifetime.nativeCommandMode !== 'boolean') ||
+            (lifetime.onOutput !== undefined && typeof lifetime.onOutput !== 'function') ||
+            (lifetime.onProgress !== undefined && typeof lifetime.onProgress !== 'function')
         )
             throw new Error('Invalid lifetime');
         if (!Array.isArray(input.args) || input.args.some((arg) => typeof arg !== 'string'))
             throw new Error('Invalid arguments');
+        if (input.nativeChoices !== undefined) {
+            if (
+                !generalMode ||
+                input.args[0] !== 'deploy' ||
+                input.nativeChoices === null ||
+                typeof input.nativeChoices !== 'object' ||
+                Object.keys(input.nativeChoices).length !== 1 ||
+                typeof input.nativeChoices.fixShared !== 'string' ||
+                input.nativeChoices.fixShared.trim().length === 0 ||
+                input.nativeChoices.fixShared.includes('\0')
+            )
+                throw new Error('Invalid native choices');
+            bridgeEntry = fileURLToPath(new URL('native-cli-bridge.js', import.meta.url));
+            canonical(bridgeEntry, false);
+        }
         canonical(input.projectRoot, true);
         canonical(process.execPath, false);
         cliEntry =
@@ -132,16 +165,22 @@ export async function runNativeProcess(
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         if (
             manifest.name !== 'mcdev' ||
-            manifest.version !== '10.1.0' ||
+            !(generalMode
+                ? typeof manifest.version === 'string' &&
+                  /^10\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(manifest.version)
+                : manifest.version === '10.1.0') ||
             manifest.bin?.mcdev !== 'lib/cli.js'
         )
             throw new Error('Unsupported CLI');
+        if (bridgeEntry) canonical(path.join(path.dirname(cliEntry), 'index.js'), false);
         env = createNativeEnvironment();
     } catch {
         return result('invalid-input');
     }
     if (lifetime.signal.aborted) return result('cancelled', 'cancelled');
-    const argv = [cliEntry, ...input.args];
+    const argv = bridgeEntry
+        ? [bridgeEntry, cliEntry, input.nativeChoices!.fixShared, ...input.args]
+        : [cliEntry, ...input.args];
     return new Promise((resolve) => {
         let child: ReturnType<typeof spawn>;
         try {
@@ -175,8 +214,12 @@ export async function runNativeProcess(
             stopping = reason;
             // No independently trusted OS helper identity: never select executables from SYSTEMROOT.
             // Direct-child termination is bounded best effort, not proof that descendants stopped.
-            child.kill('SIGKILL');
             grace = setTimeout(() => finish('termination-unconfirmed'), GRACE_MS);
+            try {
+                child.kill('SIGKILL');
+            } catch {
+                // A failed kill is not evidence of termination; wait for close or bounded grace.
+            }
         };
         const cancel = () => stop('cancelled');
         const timer = setTimeout(() => stop('timed-out'), timeoutMs);
@@ -192,14 +235,36 @@ export async function runNativeProcess(
             state.exitCode = code;
             state.exitSignal = signal;
             if (!stopping) finish('exited');
+            else if (generalMode) finish(stopping);
         });
         for (const [stream, counter] of [
             [child.stdout, 'stdoutBytes'],
             [child.stderr, 'stderrBytes'],
         ] as const) {
             stream?.on('data', (chunk: Buffer) => {
-                state[counter] = Math.min(OUTPUT_LIMIT + 1, state[counter] + chunk.length);
-                if (state.stdoutBytes + state.stderrBytes > OUTPUT_LIMIT) stop('output-limit');
+                state[counter] = Math.min(
+                    generalMode ? Number.MAX_SAFE_INTEGER : OUTPUT_LIMIT + 1,
+                    state[counter] + chunk.length
+                );
+                if (generalMode) {
+                    // Observer failures must not leave pipes undrained or change process outcomes.
+                    try {
+                        lifetime.onOutput?.(counter === 'stdoutBytes' ? 'stdout' : 'stderr', chunk);
+                    } catch {
+                        // Diagnostics are best effort; the caller owns observer reliability.
+                    }
+                    try {
+                        lifetime.onProgress?.(
+                            Object.freeze({
+                                stdoutBytes: state.stdoutBytes,
+                                stderrBytes: state.stderrBytes,
+                            })
+                        );
+                    } catch {
+                        // Progress delivery is best effort and never stops the child.
+                    }
+                } else if (state.stdoutBytes + state.stderrBytes > OUTPUT_LIMIT)
+                    stop('output-limit');
             });
             stream?.on('error', () => stop('output-limit'));
         }

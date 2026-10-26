@@ -1,0 +1,14 @@
+/** Host-facing native workflow guidance; not execution admission, authorization or CLI parsing. */
+export const NATIVE_WORKFLOW_INSTRUCTIONS = Object.freeze([
+    'Use run_mcdev_command for supported noninteractive native retrieve, deploy, build, buildTemplate, buildDefinition, buildDefinitionBulk and clone workflows. The same runner supports badKeys and document reports, explainTypes --json catalogs and resolveId BU asset ID --json results. getFilesToCommit execution is blocked because the installed CLI discards its result; use its local programmatic API. Consult execution availability and result restrictions, not declaration presence alone.',
+    "Use ordinary host approval for the requested operation and its effects. Establish the project and explicit credential/BU target, source/target markets or market list where relevant, and explicit native choices before running. Do not invent targets, choose defaults on the user's behalf, or add a bespoke approval ceremony.",
+    'Preserve native selectors and flags, including requested key, ID, name, whole-type or broader selectors where natively supported. Let mcdev parse CLI syntax; do not replace it with a second CLI parser or silently narrow the requested scope.',
+    'Prompt-dependent cases without explicit choices are blocked. For deploy shared-Data-Extension repair, supply --fixShared=ChildA,ChildB or --fixShared=*; configured child selections are validated before an isolated native API bridge runs the unchanged CLI. Bare --fixShared is not a choice. Ask for missing choices or explain the blocked case; do not feed guessed answers to prompts or retry with broader scope.',
+    'Missing companion language, SQL or vendor MCP tools do not block otherwise supported native work. Disclose unperformed checks; stop only the work that actually needs the missing capability. Metadata retrieval is not SQL execution, row access or SSJS runtime execution.',
+    'A useful result is not independently verified success: report native diagnostics, exit status and observed artifacts separately from verified remote state. Native logs, a zero exit code or generated files alone do not prove complete retrieval, deployment or synchronization.',
+    'Native cleanup, overwrite/purge behavior, authentication, project configuration, executable validation hooks and type-specific side effects remain native. Review and disclose relevant effects; do not describe build or clone as universally local-only or disable hooks/authentication to force a result.',
+    'No implicit deploy or runtime action: retrieving, editing, building or cloning does not authorize deploy, execute, schedule, publish, refresh, message sending or automation execution. Obtain explicit operation-specific intent for those actions and their flags.',
+]);
+
+/** Joined instructions for server-level host guidance without importing the runner contract. */
+export const NATIVE_WORKFLOW_GUIDANCE = NATIVE_WORKFLOW_INSTRUCTIONS.join('\n');

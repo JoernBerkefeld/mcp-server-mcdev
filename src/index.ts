@@ -33,36 +33,9 @@ import { inventoryProjectArtifacts } from './project-artifacts.js';
 import { readProjectArtifactSource, resolveProjectArtifact } from './project-artifact-resolver.js';
 import { previewProjectCommand } from './project-command-preview.js';
 import { ensureMcdevSilentJson, getBundledMcdevVersion } from './mcdev-safe.js';
-import {
-    prepareQueryRetrievePreview,
-    queryRetrievePreviewInputSchema,
-    QUERY_RETRIEVE_PREVIEW_FAILURE,
-} from './query-retrieve-preview.js';
-import {
-    executeQueryRetrieve,
-    queryRetrieveExecutionInputSchema,
-    QUERY_RETRIEVE_EXECUTION_FAILURE,
-} from './query-retrieve-execution.js';
-import {
-    executeScriptRetrieve,
-    scriptRetrieveExecutionInputSchema,
-    SCRIPT_RETRIEVE_EXECUTION_FAILURE,
-} from './script-retrieve-execution.js';
-
 import { diagnoseRetrieveLogs } from './retrieve-log-diagnostics.js';
-import { executeQueryDefinitionRender } from './query-definition-render.js';
-
-const RENDER_FAILURE = 'Query definition render unavailable.';
-const renderInputSchema = z.strictObject(
-    {
-        workspaceRoot: z.string({ error: RENDER_FAILURE }),
-        credential: z.string({ error: RENDER_FAILURE }),
-        businessUnit: z.string({ error: RENDER_FAILURE }),
-        templateName: z.string({ error: RENDER_FAILURE }),
-        market: z.string({ error: RENDER_FAILURE }),
-    },
-    { error: RENDER_FAILURE }
-);
+import { executeNativeCommand, reconcileNativeCommand } from './native-command-execution.js';
+import { NATIVE_WORKFLOW_GUIDANCE } from './native-workflow-guidance.js';
 
 const RETRIEVE_LOG_FAILURE = 'Retrieve log diagnosis unavailable.';
 const retrieveLogInputSchema = z.strictObject(
@@ -100,10 +73,67 @@ const server = new McpServer({
 });
 
 server.registerTool(
+    'run_mcdev_command',
+    {
+        description:
+            'Execute an explicitly requested native mcdev command in a developer-controlled project. Use mcdev_get_command for syntax and execution availability. args are exact argv tokens after the canonical command, not a shell string. Supports native metadata selectors, markets, validation hooks and native overwrite/deletion/auth-persistence effects. Supply explicit target/choices; no terminal interaction or automatic defaults. Deploy/runtime effects require the corresponding user request and ordinary host approval; no extra consent ritual. Diagnostics are bounded projections, not raw output. Completion is not independent remote verification; never automatically retry partial/unknown operations. Configure host timeouts for long operations; progress is emitted when requested.',
+        inputSchema: z.strictObject({
+            workspaceRoot: z.string(),
+            command: z.string(),
+            args: z.array(z.string()),
+            timeoutMs: z.number().int().positive().max(86_400_000).optional(),
+        }),
+        annotations: {
+            readOnlyHint: false,
+            destructiveHint: true,
+            openWorldHint: true,
+            idempotentHint: false,
+        },
+    },
+    async (input, extra) => {
+        const result = await executeNativeCommand(input, {
+            signal: extra.signal,
+            progress: (elapsedSeconds) => {
+                const progressToken = extra._meta?.progressToken;
+                if (progressToken !== undefined) {
+                    void extra
+                        .sendNotification({
+                            method: 'notifications/progress',
+                            params: {
+                                progressToken,
+                                progress: elapsedSeconds,
+                                message: 'Native mcdev operation running',
+                            },
+                        })
+                        .catch(() => {});
+                }
+            },
+        });
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    }
+);
+
+server.registerTool(
+    'reconcile_mcdev_operation',
+    {
+        description:
+            'Release an uncertain native-operation latch only after the operator has confirmed all related processes stopped and reconciled partial local/remote effects. This acknowledgement does not perform or verify reconciliation, kill processes, retry commands or authorize a new operation. Never call solely because a server restarted or a timeout elapsed.',
+        inputSchema: z.strictObject({
+            workspaceRoot: z.string(),
+            operatorReconciled: z.literal(true),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ workspaceRoot }) => ({
+        content: [{ type: 'text', text: JSON.stringify(reconcileNativeCommand(workspaceRoot)) }],
+    })
+);
+
+server.registerTool(
     'diagnose_mcdev_retrieve_logs',
     {
         description:
-            'Read-only historical normal-log diagnosis for one exact configured credential/businessUnit and query or script key. Reads only bounded project/logs timestamp files, never error companions or authentication/session contents. Requires caller-managed quiescence. Supports only mcdev 10.1.0 canonical retrieve credential/BU type key with literal selectors and no options, aliases or quotes, within an explicit UTC ISO millisecond window of at most 24 hours. Returns finite observations and validated basename/time provenance, never raw logs, paths, errors, secrets or remote completeness. No subprocess, network, native execution, elicitation or rerun. Current retrieval tools use --noLogFile; absent evidence is no-match, not a reason to repeat retrieval. Unknown records are suppressed; investigate manually when evidence is insufficient.',
+            'Read-only historical normal-log diagnosis for one exact configured credential/businessUnit and query or script key. Reads only bounded project/logs timestamp files, never error companions or authentication/session contents. Requires caller-managed quiescence. Supports only mcdev 10.1.0 canonical retrieve credential/BU type key with literal selectors and no options, aliases or quotes, within an explicit UTC ISO millisecond window of at most 24 hours. Returns finite observations and validated basename/time provenance, never raw logs, paths, errors, secrets or remote completeness. No subprocess, network, native execution, elicitation or rerun. Native calls with --noLogFile produce no historical logs; absent evidence is no-match, not a reason to repeat retrieval. Unknown records are suppressed; investigate manually when evidence is insufficient.',
         inputSchema: retrieveLogInputSchema,
         annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     },
@@ -117,129 +147,6 @@ server.registerTool(
                 isError: true,
                 content: [{ type: 'text', text: RETRIEVE_LOG_FAILURE }],
             };
-        }
-    }
-);
-
-server.registerTool(
-    'prepare_mcdev_query_retrieve',
-    {
-        description:
-            'Read-only, non-executing local preparation for one exact credential/BU/query key, supported only by the reviewed Windows mcdev 10.1.0 preparation. Host must hold project/path mutation exclusion throughout collection. No native mcdev launch, confirmation or authentication/session content inspection. Uses fixed read-only Git metadata subprocesses. Returns bounded local evidence, not a dry-run, remote completeness, execution readiness, operation approval or deletion authorization. Execution remains disabled.',
-        inputSchema: queryRetrievePreviewInputSchema,
-        annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-    },
-    (input) => {
-        try {
-            return {
-                content: [
-                    { type: 'text', text: JSON.stringify(prepareQueryRetrievePreview(input)) },
-                ],
-            };
-        } catch {
-            return {
-                isError: true,
-                content: [{ type: 'text', text: QUERY_RETRIEVE_PREVIEW_FAILURE }],
-            };
-        }
-    }
-);
-
-server.registerTool(
-    'retrieve_mcdev_query',
-    {
-        description:
-            'Retrieve metadata for one exact credential/BU/query key using reviewed Windows mcdev 10.1.0; never execute or activate SQL. Performs fresh local preparation; no preview token or custom approval form is required. Host tool approval remains host-controlled. Caller must maintain quiescent project/path access from preparation through process/artifact settlement; the server does not enforce external exclusion. Native mcdev may create/overwrite or delete the exact JSON/SQL pair, read parent/shared dependencies and privately refresh/persist authentication/session state. No authentication/session content inspection or raw native output is returned. Request cancellation is supervised; partial effects and unknown termination are possible. Unknown termination blocks further project runs pending operator reconciliation; restarting is not proof of reconciliation. No automatic retry. Zero exit and local artifacts never prove remote completeness.',
-        inputSchema: queryRetrieveExecutionInputSchema,
-        annotations: {
-            readOnlyHint: false,
-            destructiveHint: true,
-            idempotentHint: false,
-            openWorldHint: true,
-        },
-    },
-    async (input, extra) => {
-        try {
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(
-                            await executeQueryRetrieve(input, { signal: extra.signal })
-                        ),
-                    },
-                ],
-            };
-        } catch {
-            return {
-                isError: true,
-                content: [{ type: 'text', text: QUERY_RETRIEVE_EXECUTION_FAILURE }],
-            };
-        }
-    }
-);
-
-server.registerTool(
-    'retrieve_mcdev_script',
-    {
-        description:
-            'Retrieve Script Activity metadata for one exact credential/BU/script key using reviewed Windows mcdev 10.1.0; never execute SSJS or run an automation. Performs fresh local preparation; no preview token or custom approval form is required. Host tool approval remains host-controlled. Caller must maintain quiescent project/path access through preparation and settlement; external exclusion is not enforced. Native paginated collection reads can include unrelated remote scripts before local key filtering. Native mcdev may create/overwrite or delete JSON and SSJS/HTML candidates, read parent/shared dependencies and privately refresh/persist authentication/session state. Local materialization requires changed JSON plus exactly one SSJS or HTML companion; both companions are ambiguous. No authentication/session content inspection or raw native output is returned. Request cancellation is supervised; partial effects and unknown termination are possible. Unknown termination blocks both retrieval families for that project pending operator reconciliation; restarting is not reconciliation. No automatic retry. Zero exit and local artifacts never prove remote completeness.',
-        inputSchema: scriptRetrieveExecutionInputSchema,
-        annotations: {
-            readOnlyHint: false,
-            destructiveHint: true,
-            idempotentHint: false,
-            openWorldHint: true,
-        },
-    },
-    async (input, extra) => {
-        try {
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(
-                            await executeScriptRetrieve(input, { signal: extra.signal })
-                        ),
-                    },
-                ],
-            };
-        } catch {
-            return {
-                isError: true,
-                content: [{ type: 'text', text: SCRIPT_RETRIEVE_EXECUTION_FAILURE }],
-            };
-        }
-    }
-);
-
-server.registerTool(
-    'render_mcdev_query_definition',
-    {
-        description:
-            'Render one exact query template and named market through reviewed Windows mcdev 10.1.0 buildDefinition. Requires static JSON with a literal safe key, restricted simple SQL market substitutions and explicitly disabled buildDefinition validation hooks. Writes or overwrites the key-named JSON/SQL pair in all configured project-contained templateBuilds destinations, with purge explicitly off. Ordinary native SDK initialization and authentication/session/network effects are accepted native behavior, not a local-only guarantee. Caller must maintain external project/path quiescence through preparation and settlement; the shared server guard does not lock other processes. Request cancellation is best-effort; partial effects and unknown termination are possible. No automatic retry or rollback. No custom consent form or repeated confirmation; ordinary host tool approval applies. Returns bounded per-destination observations, never raw output or secrets. Exit zero and local materialization do not prove artifact or remote completeness, invocation causality or language validation. Dynamic JSON keys and JSON templating are unavailable; this does not execute or activate SQL.',
-        inputSchema: renderInputSchema,
-        annotations: {
-            readOnlyHint: false,
-            destructiveHint: true,
-            idempotentHint: false,
-            openWorldHint: true,
-        },
-    },
-    async (input, extra) => {
-        try {
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(
-                            await executeQueryDefinitionRender(input, { signal: extra.signal })
-                        ),
-                    },
-                ],
-            };
-        } catch {
-            return { isError: true, content: [{ type: 'text', text: RENDER_FAILURE }] };
         }
     }
 );
@@ -458,14 +365,14 @@ server.tool(
 
 server.tool(
     'mcdev_list_commands',
-    'Read-only reviewed mcdev command declarations and aliases. Guidance-only, not executable commands or an argv allowlist. No subprocess or dry run; native mcdev has no dry-run mode. Effects and execution readiness are not verified.',
+    'Read-only native mcdev command discovery: signatures, aliases, execution availability and effects. Use run_mcdev_command for supported commands with explicit arguments and ordinary host approval. Listing itself performs no subprocess or dry run; native mcdev has no dry-run mode. Project readiness is not verified.',
     {},
     () => ({ content: [{ type: 'text', text: JSON.stringify(listCommands()) }] })
 );
 
 server.tool(
     'mcdev_get_command',
-    'Read-only exact, case-sensitive canonical command name or alias lookup. Guidance-only, not an executable command or approval. No subprocess or dry run; native mcdev has no dry-run mode. Effects and execution readiness are not verified.',
+    'Read-only exact, case-sensitive native command or alias lookup. Returns signature, execution availability and effects; use the canonical name with run_mcdev_command when supported. Lookup grants no approval, launches no process and is not a dry run. Project readiness remains unverified.',
     { nameOrAlias: z.string().describe('Exact canonical command name or alias, never argv.') },
     ({ nameOrAlias }) => {
         const command = lookupCommand(nameOrAlias);
@@ -906,7 +813,8 @@ server.prompt(
                 content: {
                     type: 'text',
                     text: [
-                        'You are helping plan an Accenture SFMC DevTools (mcdev) change. These tools do not execute a complete retrieve/build/deploy workflow; do not claim those operations were performed.',
+                        'You are helping a developer use native Accenture SFMC DevTools (mcdev) through AI. Execute only requested operations using run_mcdev_command; report evidence, not invented success.',
+                        NATIVE_WORKFLOW_GUIDANCE,
                         '',
                         '## Host capability routing (static guidance only)',
                         'Resolve the requested intent explicitly; ask about ambiguous intent instead of guessing. This finite directory is not a classifier, tool inventory, executable allowlist or availability claim.',
@@ -921,11 +829,11 @@ server.prompt(
                         'Prefer local mcdev source edits/build/deploy guidance over direct vendor metadata edits when both routes satisfy the goal. If an independently authorized vendor metadata create/update is used, first confirm remote completion through the actual discovered completion/status contract in matching account/BU context. Accepted, running, failed or unknown completion is not completed: leave synchronization pending; do not retrieve or retry, invent polling or a job/status endpoint.',
                         'After confirmed vendor completion, the next workflow step is exact local synchronization assessment: resolve canonical workspaceRoot, credential, businessUnit, metadataType and literal externalKey, then assess the exact metadata JSON and all extracted companion destinations through supported project inspection. Assess and disclose clean, dirty and companion-only local artifacts, local edits and uncertainty; absence must be established, not guessed. Uncertain identity, ambiguous key/BU, unsupported or blocked resolution, or uncertain destination completeness/existence leaves synchronization pending; ask only for genuinely unresolved choices or authority outside the existing scope.',
                         'Disclose native overwrite/possible-deletion/auth-persistence effects and honor existing authorization for its stated scope. Existing clean, dirty or companion-only artifacts do not automatically require renewed consent or repeated native-effects/overwrite confirmation. Ordinary host tool approval remains host-controlled. If the host actually denies the retrieval, leave artifacts untouched and synchronization pending; do not bypass that denial.',
-                        'For a resolved supported exact query or Script Activity, use only **retrieve_mcdev_query** or **retrieve_mcdev_script** under its existing restrictions. Other metadata types remain pending with manual targeted native guidance, not an executable promise. No whole-type/whole-BU or broad fallback retrieval. Rows, runtime, sends and contact changes have no invented retrievable metadata equivalent; report the limitation without fictional synchronization.',
+                        'For requested metadata retrieval, use **run_mcdev_command** with command retrieve and the explicit native selection, including other metadata types. Never widen a failed exact selection to whole-type/whole-BU fallback without that scope being requested. Rows, runtime, sends and contact changes have no invented retrievable metadata equivalent; report the limitation without fictional synchronization.',
                         'Assess retrieval evidence honestly: failed, partial, unchanged or unverified results and unknown termination leave synchronization pending, never successful synchronization. Local materialization is local evidence only, not remote completeness; report remaining uncertainty and never silently deploy stale artifacts. This section performs no operations, server-to-server calls, automatic reconciliation, locks or polling.',
                         '',
                         '## Instructions',
-                        'Apply the qualified artifact/source inspection chain below only to metadata-source tasks that need local artifacts; do not require it for row-only or send-only goals. Language-only work uses an established source kind and complete current document. Retrieval-only work uses the existing restricted tool contract, not a mandatory prior source read.',
+                        'Apply the qualified artifact/source inspection chain below only to metadata-source tasks that need local artifacts; do not require it for row-only or send-only goals. Language-only work uses an established source kind and complete current document. Retrieval-only work uses the general native command contract, not a mandatory prior source read.',
                         '1. Call **mcdev_search_docs** with keywords from the goal (markets, createDeltaPkg, build, journey, etc.).',
                         '2. If configuration matters, call **mcdev_explain_config_key** for relevant keys.',
                         '3. For journeys/automations, call **mcdev_component_checklist** with the component name.',
@@ -936,9 +844,9 @@ server.prompt(
                         '6. Call **inventory_mcdev_project_artifacts**, then **resolve_mcdev_project_artifact** with explicit workspaceRoot, rootKind (retrieve/deploy), credential, businessUnit, metadataType and externalKey. Do not guess across roots, BUs or keys; stop on blocked, ambiguous or unsupported resolution. Dependencies and remote freshness remain unconfirmed.',
                         '7. Call **read_mcdev_artifact_source** with that qualified identity, never an arbitrary path. For multiple email extracts, ask which sourceRole (html, preheader or text) to select; do not guess. Use the selected editable role and complete original text plus SHA-256 of original bytes, not JSON metadata or a truncated snippet; re-read after edits to bind validation to the current full document and hash.',
                         '8. The host must discover available companion tool schemas before use; sibling tools are optional and cannot be assumed available. Discover **detect_sfmc_platform**, then detect the project platform before language lookups or validation. An mcdev project targets Marketing Cloud Engagement: use target engagement only after confirmation; stop and clarify unknown or conflicting detection. Discover **lookup_ssjs_function** / **lookup_ampscript_function** for relevant identifiers before authoring; honor supported status, caveats and required polyfills. Route selected SSJS to **validate_ssjs** and selected email HTML (including mixed content) to **validate_sfmc_html**, passing the complete current document and target engagement. Use **validate_ampscript** only for established AMPscript source, not every .amp file. Preheader/text are text-validator-not-established; SQL validation is not established. Do not infer validators from extensions alone.',
-                        '9. The host coordinates these calls; this server performs no server-to-server RPC and embeds no duplicated language data. If a companion capability is missing, explicitly report unperformed lookups/validation and limitations; stop only when that capability is essential to the requested work. Never claim native rendering was performed: no Builder calls, rendering or native dry-run. These source handoff tools do not execute retrieve/build/deploy; the separate exact-query and exact-script metadata retrieval tools are described below.',
-                        '10. For retrieve/deploy guidance only, call **preview_mcdev_project_command** with the explicit project credential/businessUnit, reviewed type and one literal key. A preview is not a dry-run or authorization and performs no execution. For one exact query metadata retrieve, **retrieve_mcdev_query** performs fresh preparation and request-cancellable native retrieval under its documented Windows/mcdev 10.1.0 restrictions, caller-managed quiescence and native overwrite/possible-deletion/auth-persistence effects. For one exact Script Activity key, **retrieve_mcdev_script** retrieves metadata only; never execute SSJS or run an automation. It uses native paginated collection reads followed by local key filtering, not one-object-only remote access. Local materialization requires changed JSON plus exactly one SSJS or HTML companion; both companions remain ambiguous. Both tools need no custom approval form or repeated overwrite confirmation; ordinary host tool approval remains host-controlled. Other command families remain guidance-only. No broad fallback retrieve, sends, publish or SQL/runtime execution. Never retry unknown termination; operator reconciliation is required.',
-                        '11. For historical exact-key query/Script retrieve diagnosis only, use **diagnose_mcdev_retrieve_logs** with explicit configured credential/businessUnit, metadataType, key and startedAfter/startedBefore UTC timestamps. This dedicated bounded normal-log reader is the sole log-content exception; never use general log/auth/session readers or expose raw records. Keep the project quiescent. It returns finite observations only, not remote completeness. Current retrieval tools use --noLogFile: no-match is honest absence, never permission to rerun. Unsupported/ambiguous/blocked/unavailable evidence or suppressed unknown records require manual investigation, not guessed findings or an API-log rerun.',
+                        '9. The host coordinates these calls; this server performs no server-to-server RPC and embeds no duplicated language data. If a companion capability is missing, explicitly report unperformed lookups/validation and limitations; stop only when that capability is essential to the requested work. These source handoff tools do not themselves execute retrieve/build/deploy. Use run_mcdev_command for requested native operations and report its actual evidence; there is no native dry-run.',
+                        '10. For requested native execution, call **run_mcdev_command** using discovered syntax and explicit choices. Optional retrieve/deploy guidance can use **preview_mcdev_project_command** with the explicit project credential/businessUnit, reviewed type and one literal key. A preview is not a dry-run or authorization and performs no execution. Use run_mcdev_command for supported retrieve/deploy/build families and catalog-listed noninteractive commands. Native overwrite/possible-deletion/auth-persistence effects apply; no custom approval form or repeated overwrite confirmation is required, and ordinary host tool approval remains host-controlled. Never add broad fallback retrieval, sends, publishing or SQL/runtime execution beyond the requested scope. Never retry unknown termination; operator reconciliation is required.',
+                        '11. For historical exact-key query/Script retrieve diagnosis only, use **diagnose_mcdev_retrieve_logs** with explicit configured credential/businessUnit, metadataType, key and startedAfter/startedBefore UTC timestamps. This dedicated bounded normal-log reader is the sole log-content exception; never use general log/auth/session readers or expose raw records. Keep the project quiescent. It returns finite observations only, not remote completeness. Native calls with --noLogFile produce no historical logs: no-match is honest absence, never permission to rerun. Unsupported/ambiguous/blocked/unavailable evidence or suppressed unknown records require manual investigation, not guessed findings or an API-log rerun.',
                         '',
                         '## Goal',
                         goal,

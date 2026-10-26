@@ -124,6 +124,8 @@ describe('release runtime contract', () => {
             'utf8'
         );
         assert.match(workflow, /node: \['22\.22\.2', '24\.15\.0', 24, 25\]/);
+        assert.match(workflow, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
+        assert.match(workflow, /runs-on: \$\{\{ matrix\.os \}\}/);
     });
 
     test('configures silent JSON repeatedly without writing to stdout', () => {

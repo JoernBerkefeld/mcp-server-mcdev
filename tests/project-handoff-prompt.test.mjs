@@ -47,14 +47,13 @@ test('planning prompt preserves arguments and coordinates qualified source hando
         await t.test(
             'actual stdio prompt renders the single finite directory and preserves tool inventory',
             () => {
-                assert.equal(tools.length, 22);
+                assert.equal(tools.length, 20);
                 assert.deepEqual(
                     tools.map((entry) => entry.name).toSorted(),
                     [
+                        'run_mcdev_command',
+                        'reconcile_mcdev_operation',
                         'diagnose_mcdev_retrieve_logs',
-                        'prepare_mcdev_query_retrieve',
-                        'retrieve_mcdev_query',
-                        'retrieve_mcdev_script',
                         'mcdev_search_docs',
                         'mcdev_get_doc_section',
                         'mcdev_explain_config_key',
@@ -72,7 +71,6 @@ test('planning prompt preserves arguments and coordinates qualified source hando
                         'resolve_mcdev_project_artifact',
                         'read_mcdev_artifact_source',
                         'preview_mcdev_project_command',
-                        'render_mcdev_query_definition',
                     ].toSorted()
                 );
                 let previous = -1;
@@ -264,15 +262,12 @@ test('planning prompt preserves arguments and coordinates qualified source hando
                     text,
                     /ask only for genuinely unresolved choices or authority outside the existing scope/u
                 );
+                assert.match(text, /use \*\*run_mcdev_command\*\* with command retrieve/u);
+                assert.match(text, /including other metadata types/u);
                 assert.match(
                     text,
-                    /resolved supported exact query or Script Activity, use only \*\*retrieve_mcdev_query\*\* or \*\*retrieve_mcdev_script\*\*/u
+                    /Never widen a failed exact selection to whole-type\/whole-BU fallback/u
                 );
-                assert.match(
-                    text,
-                    /Other metadata types remain pending with manual targeted native guidance, not an executable promise/u
-                );
-                assert.match(text, /No whole-type\/whole-BU or broad fallback retrieval/u);
                 assert.match(
                     text,
                     /Rows, runtime, sends and contact changes have no invented retrievable metadata equivalent/u
@@ -305,7 +300,7 @@ test('planning prompt preserves arguments and coordinates qualified source hando
             );
             assert.match(
                 text,
-                /--noLogFile: no-match is honest absence, never permission to rerun/u
+                /--noLogFile produce no historical logs: no-match is honest absence, never permission to rerun/u
             );
             assert.match(text, /manual investigation, not guessed findings or an API-log rerun/u);
             assert.match(
@@ -314,7 +309,7 @@ test('planning prompt preserves arguments and coordinates qualified source hando
             );
             assert.match(
                 text,
-                /Never claim native rendering was performed: no Builder calls, rendering or native dry-run/u
+                /Use run_mcdev_command for requested native operations and report its actual evidence/u
             );
             assert.match(
                 text,
@@ -322,20 +317,17 @@ test('planning prompt preserves arguments and coordinates qualified source hando
             );
             assert.match(
                 text,
-                /retrieve_mcdev_query.*fresh preparation and request-cancellable native retrieval/u
-            );
-            assert.match(text, /retrieve_mcdev_script.*metadata only.*never execute SSJS/u);
-            assert.match(text, /JSON plus exactly one SSJS or HTML companion/u);
-            assert.match(
-                text,
-                /caller-managed quiescence and native overwrite\/possible-deletion\/auth-persistence effects/u
+                /Native overwrite\/possible-deletion\/auth-persistence effects apply/u
             );
             assert.match(text, /no custom approval form or repeated overwrite confirmation/u);
             assert.match(text, /ordinary host tool approval remains host-controlled/u);
-            assert.match(text, /Other command families remain guidance-only/u);
             assert.match(
                 text,
-                /No broad fallback retrieve, sends, publish or SQL\/runtime execution/u
+                /Use run_mcdev_command for supported retrieve\/deploy\/build families/u
+            );
+            assert.match(
+                text,
+                /Never add broad fallback retrieval, sends, publishing or SQL\/runtime execution beyond the requested scope/u
             );
             assert.match(
                 text,

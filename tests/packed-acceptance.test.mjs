@@ -77,6 +77,8 @@ test(
             for (const filename of [
                 'dist/index.js',
                 'dist/mcdev-safe.js',
+                'dist/native-cli-bridge.js',
+                'dist/native-command-execution.js',
                 'data/metadata-checklists.json',
                 'server.json',
                 'package.json',
@@ -91,9 +93,6 @@ test(
             );
             assert.ok(!files.some((filename) => filename.startsWith('node_modules/')));
             assert.ok(!files.some((filename) => /^(?:scripts|tests)\//u.test(filename)));
-            assert.ok(files.includes('dist/query-retrieve-preview.js'));
-            assert.ok(files.includes('dist/query-retrieve-execution.js'));
-            assert.ok(files.includes('dist/script-retrieve-execution.js'));
             assert.ok(files.includes('dist/retrieve-log-diagnostics.js'));
         });
         fs.writeFileSync(
@@ -270,6 +269,8 @@ test(
                 assert.deepEqual(
                     result.tools.map((entry) => entry.name).toSorted(),
                     [
+                        'run_mcdev_command',
+                        'reconcile_mcdev_operation',
                         'mcdev_search_docs',
                         'mcdev_get_doc_section',
                         'mcdev_explain_config_key',
@@ -286,14 +287,29 @@ test(
                         'resolve_mcdev_project_artifact',
                         'read_mcdev_artifact_source',
                         'preview_mcdev_project_command',
-                        'prepare_mcdev_query_retrieve',
-                        'retrieve_mcdev_query',
-                        'retrieve_mcdev_script',
-                        'render_mcdev_query_definition',
                         'diagnose_mcdev_retrieve_logs',
                         'preview_mcdev_project_config',
                     ].toSorted()
                 );
+                const nativeResult = JSON.parse(
+                    await tool('run_mcdev_command', {
+                        workspaceRoot: 'relative',
+                        command: 'retrieve',
+                        args: ['cred/BU'],
+                    })
+                );
+                assert.equal(nativeResult.outcome, 'invalid-input');
+                const nativeCatalog = JSON.parse(
+                    await tool('run_mcdev_command', {
+                        workspaceRoot: fixture,
+                        command: 'explainTypes',
+                        args: ['--json', '--noLogFile'],
+                    })
+                );
+                assert.equal(nativeCatalog.outcome, 'exited');
+                assert.equal(nativeCatalog.process.exitCode, 0);
+                assert.equal(nativeCatalog.runtimeVersion, '10.1.0');
+                assert.equal(nativeCatalog.remoteCompletenessVerified, false);
                 const all = await tool('mcdev_list_metadata_types');
                 assert.match(all, /^mcdev 10\.1\.0 — \d+ type\(s\)/);
                 assert.match(all, /\*\*journey\*\*/);
@@ -355,144 +371,33 @@ test(
             }
         );
         await t.test(
-            'installed query preparation is non-executing and safely blocked',
-            async () => {
-                const result = await request('tools/call', {
-                    name: 'prepare_mcdev_query_retrieve',
-                    arguments: {
-                        workspaceRoot: fixture,
-                        credential: 'synthetic',
-                        businessUnit: 'QA',
-                        key: 'Example_1',
-                    },
-                });
-                assert.equal(result.isError, true);
-                assert.equal(result.content[0].text, 'Query retrieve preparation unavailable.');
-                assert.doesNotMatch(JSON.stringify(result), /acceptance-secret|acceptance-auth/u);
-            }
-        );
-        await t.test(
-            'installed production query executor fails safely before native launch',
-            async () => {
-                const result = await request('tools/call', {
-                    name: 'retrieve_mcdev_query',
-                    arguments: {
-                        workspaceRoot: fixture,
-                        credential: 'synthetic',
-                        businessUnit: 'QA',
-                        key: 'Example_1',
-                    },
-                });
-                assert.equal(result.isError, true);
-                assert.equal(result.content[0].text, 'Query retrieve unavailable.');
-                assert.doesNotMatch(JSON.stringify(result), /acceptance-secret|acceptance-auth/u);
-                assert.equal(fs.existsSync(path.join(fixture, 'retrieve')), false);
-            }
-        );
-        await t.test(
-            'installed Script metadata executor rejects unsupported scope safely',
-            async () => {
-                for (const extra of [{}, { key: '*' }, { metadataType: 'query' }]) {
-                    const result = await request('tools/call', {
-                        name: 'retrieve_mcdev_script',
-                        arguments: {
-                            workspaceRoot: fixture,
-                            credential: 'synthetic',
-                            businessUnit: 'QA',
-                            key: 'Example_1',
-                            ...extra,
-                        },
-                    });
-                    assert.equal(result.isError, true);
-                    assert.match(result.content[0].text, /Script retrieve unavailable\./u);
-                    assert.doesNotMatch(
-                        JSON.stringify(result),
-                        /acceptance-secret|acceptance-auth/u
-                    );
-                    assert.equal(fs.existsSync(path.join(fixture, 'retrieve')), false);
-                }
-            }
-        );
-        await t.test(
-            'installed render schema and unavailable selectors are bounded and non-executing',
+            'installed package has no legacy tools or modules and README matches tools',
             async () => {
                 const listed = await request('tools/list');
-                const render = listed.tools.find(
-                    (entry) => entry.name === 'render_mcdev_query_definition'
-                );
-                const selection = {
-                    workspaceRoot: fixture,
-                    credential: 'synthetic',
-                    businessUnit: 'QA',
-                    templateName: 'Source_1',
-                    market: 'qa',
-                };
-                assert.equal(listed.tools.length, 22);
-                assert.deepEqual(render.inputSchema.required, Object.keys(selection));
-                assert.deepEqual(
-                    Object.keys(render.inputSchema.properties),
-                    Object.keys(selection)
-                );
-                assert.equal(render.inputSchema.additionalProperties, false);
-                for (const property of Object.values(render.inputSchema.properties))
-                    assert.deepEqual(property, { type: 'string' });
-                assert.deepEqual(render.annotations, {
-                    readOnlyHint: false,
-                    destructiveHint: true,
-                    idempotentHint: false,
-                    openWorldHint: true,
-                });
-                const before = fs.readdirSync(fixture);
-                const configBefore = fs.readFileSync(path.join(fixture, '.mcdevrc.json'));
-                for (const args of [
-                    {},
-                    { ...selection, 'acceptance-secret-extra': true },
-                    ...Object.keys(selection).map((key) => ({
-                        ...selection,
-                        [key]: ['acceptance-secret-invalid'],
-                    })),
+                const names = listed.tools.map(({ name }) => name).toSorted();
+                assert.equal(names.length, 20);
+                for (const name of [
+                    'retrieve_mcdev_query',
+                    'retrieve_mcdev_script',
+                    'prepare_mcdev_query_retrieve',
+                    'render_mcdev_query_definition',
                 ]) {
-                    const result = await request('tools/call', {
-                        name: render.name,
-                        arguments: args,
-                    });
-                    assert.equal(result.isError, true);
-                    assert.match(result.content[0].text, /Query definition render unavailable\./u);
-                    assert.doesNotMatch(
-                        JSON.stringify(result),
-                        /acceptance-secret|acceptance-auth|ZodError|ENOENT/u
-                    );
+                    assert.ok(!names.includes(name));
                 }
-                for (const extra of [
-                    {},
-                    { templateName: '*' },
-                    { market: 'one,two' },
-                    { credential: 'acceptance-secret-invalid' },
-                    { workspaceRoot: 'relative-private-root' },
-                ]) {
-                    const result = await request('tools/call', {
-                        name: render.name,
-                        arguments: { ...selection, ...extra },
-                    });
-                    assert.notEqual(result.isError, true);
-                    assert.deepEqual(JSON.parse(result.content[0].text), {
-                        outcome: 'unavailable',
-                        processOutcome: null,
-                        projectBlocked: false,
-                        destinations: [],
-                        artifactCompletenessVerified: false,
-                        remoteCompletenessVerified: false,
-                        languageValidationPerformed: false,
-                    });
-                    assert.doesNotMatch(
-                        JSON.stringify(result),
-                        /acceptance-secret|acceptance-auth|relative-private-root|stdout|stderr/u
-                    );
-                }
-                assert.deepEqual(fs.readdirSync(fixture), before);
-                assert.deepEqual(
-                    fs.readFileSync(path.join(fixture, '.mcdevrc.json')),
-                    configBefore
+                const readme = fs.readFileSync(path.join(installed, 'README.md'), 'utf8');
+                const documented = [
+                    ...readme
+                        .split('## Tools')[1]
+                        .split('## Native execution')[0]
+                        .matchAll(/^\| `([^`]+)`/gmu),
+                ]
+                    .map((match) => match[1])
+                    .toSorted();
+                assert.deepEqual(documented, names);
+                assert.ok(
+                    !files.some((file) =>
+                        /(?:query-retrieve|script-retrieve|query-definition-render)/u.test(file)
+                    )
                 );
             }
         );
@@ -775,10 +680,7 @@ test(
             assert.equal(config, configText);
             assert.deepEqual(JSON.parse(config), JSON.parse(configText));
             assert.doesNotMatch(config, /acceptance-auth-never-read/);
-            assert.match(
-                prompt.messages[0].content.text,
-                /do not claim those operations were performed/
-            );
+            assert.match(prompt.messages[0].content.text, /report evidence, not invented success/);
         });
     }
 );

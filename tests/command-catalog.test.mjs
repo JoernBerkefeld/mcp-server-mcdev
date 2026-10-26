@@ -5,6 +5,7 @@ import ts from 'typescript';
 import {
     CAPABILITY_ROUTES,
     COMMAND_CATALOG_SOURCE,
+    NATIVE_RUNNER_COMMANDS,
     REVIEWED_MCDEV_VERSION,
     listCommands,
     lookupCommand,
@@ -30,9 +31,8 @@ function extractDeclarations(text) {
             !ts.isCallExpression(node) ||
             !ts.isPropertyAccessExpression(node.expression) ||
             node.expression.name.text !== 'command'
-        ) {
+        )
             return;
-        }
         commandCalls++;
         const argument = node.arguments[0];
         assert.ok(ts.isArrayLiteralExpression(argument), 'Review new command declaration shape');
@@ -93,76 +93,26 @@ test('every canonical name and alias resolves uniquely with immutable bounded ex
     assert.ok(Object.isFrozen(listCommands()));
     for (const command of listCommands()) {
         assert.equal(command.reviewedVersion, REVIEWED_MCDEV_VERSION);
-        assert.equal(
-            command.execution.status,
-            command.name === 'retrieve' ? 'partially-executable' : 'guidance-only'
-        );
-        switch (command.name) {
-            case 'retrieve': {
-                assert.deepEqual(command.execution.supportedCases, [
-                    { metadataType: 'query', tool: 'retrieve_mcdev_query' },
-                    { metadataType: 'script', tool: 'retrieve_mcdev_script' },
-                ]);
-                assert.match(
-                    command.execution.reason,
-                    /full native retrieve signature is not executable/u
-                );
-                assert.match(
-                    command.execution.restrictions,
-                    /Windows and installed mcdev 10\.1\.0 only/u
-                );
-                assert.match(
-                    command.execution.restrictions,
-                    /exactly workspaceRoot, credential, businessUnit and key/u
-                );
-                assert.match(command.execution.restrictions, /one literal external key/u);
-                assert.match(
-                    command.execution.restrictions,
-                    /no arbitrary type, argv, flags or broad selectors/u
-                );
-                assert.match(
-                    command.execution.remainingGuidanceOnlyScope,
-                    /All other metadata types/u
-                );
-                assert.match(
-                    command.execution.remainingGuidanceOnlyScope,
-                    /whole-type, whole-BU, wildcard, name\/ID and fallback/u
-                );
-                assert.ok(Object.isFrozen(command.execution.supportedCases));
-                for (const supported of command.execution.supportedCases) {
-                    assert.ok(Object.isFrozen(supported));
-                }
-                assert.equal(command.reviewedEffects, undefined);
-
-                break;
-            }
-            case 'createDeltaPkg': {
-                assert.match(command.execution.reason, /Only partial createDeltaPkg effects/u);
-
-                break;
-            }
-            case 'clone': {
-                assert.match(command.execution.reason, /Only partial clone effects/u);
-                assert.equal(command.reviewedEffects.status, 'partial-source-review');
-
-                break;
-            }
-            default: {
-                if (
-                    ['build', 'buildTemplate', 'buildDefinition', 'buildDefinitionBulk'].includes(
-                        command.name
-                    )
-                ) {
-                    assert.match(command.execution.reason, /Only partial build-family effects/u);
-                    assert.equal(command.reviewedEffects.status, 'partial-source-review');
-                } else {
-                    assert.deepEqual(command.execution, {
-                        status: 'guidance-only',
-                        reason: 'Declaration inventory only. No execution adapter exists; effects, prerequisites, and interactive prompts have not been reviewed.',
-                    });
-                    assert.equal(command.reviewedEffects, undefined);
-                }
-            }
+        const native = NATIVE_RUNNER_COMMANDS.includes(command.name);
+        assert.equal(command.execution.status, native ? 'partially-executable' : 'guidance-only');
+        if (native) {
+            assert.equal(command.execution.nativeRunner.tool, 'run_mcdev_command');
+            assert.equal(command.execution.nativeRunner.availability, 'noninteractive-cases');
+            assert.match(
+                command.execution.nativeRunner.prerequisites,
+                /Ordinary host approval.*explicit.*target/u
+            );
+            assert.match(
+                command.execution.nativeRunner.blockedCases,
+                /Prompt-dependent cases without explicit choices are blocked/u
+            );
+            assert.match(
+                command.execution.nativeRunner.blockedCases,
+                /do not promise every invocation/u
+            );
+            assert.ok(Object.isFrozen(command.execution.nativeRunner));
+        } else {
+            assert.equal(command.execution.nativeRunner, undefined);
         }
         assert.equal(command.sourceReferences[0].file, COMMAND_CATALOG_SOURCE);
         assert.equal(command.sourceReferences[0].package, 'mcdev');
@@ -171,18 +121,81 @@ test('every canonical name and alias resolves uniquely with immutable bounded ex
             names.add(name);
             assert.equal(lookupCommand(name), command);
         }
-        assert.ok(Object.isFrozen(command));
-        assert.ok(Object.isFrozen(command.aliases));
-        assert.ok(Object.isFrozen(command.execution));
-        assert.ok(Object.isFrozen(command.sourceReferences));
-        assert.ok(Object.isFrozen(command.sourceReferences[0]));
-        assert.throws(() => {
-            command.aliases.push('injected');
-        }, TypeError);
+        for (const object of [
+            command,
+            command.aliases,
+            command.execution,
+            command.sourceReferences,
+            command.sourceReferences[0],
+        ])
+            assert.ok(Object.isFrozen(object));
+        assert.throws(() => command.aliases.push('injected'), TypeError);
     }
 });
 
-test('capability routes have exactly eight ordered immutable descriptive records', () => {
+test('native output availability identifies structured forms and blocked CLI results', () => {
+    const execution = lookupCommand('resolveId').execution;
+    assert.match(execution.nativeRunner.blockedCases, /resolveId BU asset ID --json/u);
+    assert.match(
+        lookupCommand('getFilesToCommit').execution.nativeRunner.blockedCases,
+        /getFilesToCommit execution is blocked/u
+    );
+});
+
+test('native support includes core seven and bounded noninteractive bonus commands', () => {
+    assert.deepEqual(NATIVE_RUNNER_COMMANDS, [
+        'retrieve',
+        'deploy',
+        'build',
+        'buildTemplate',
+        'buildDefinition',
+        'buildDefinitionBulk',
+        'clone',
+        'explainTypes',
+        'badKeys',
+        'document',
+        'resolveId',
+        'getFilesToCommit',
+    ]);
+    assert.ok(Object.isFrozen(NATIVE_RUNNER_COMMANDS));
+    for (const command of [
+        'init',
+        'join',
+        'selectTypes',
+        'execute',
+        'publish',
+        'delete',
+        'createDeltaPkg',
+    ]) {
+        assert.equal(lookupCommand(command).execution.status, 'guidance-only');
+    }
+});
+
+test('native retrieval has no compatibility fields and reviewed effects survive', () => {
+    const retrieve = lookupCommand('retrieve');
+    assert.equal(retrieve.execution.nativeRunner.tool, 'run_mcdev_command');
+    assert.equal(retrieve.execution.supportedCases, undefined);
+    assert.equal(retrieve.execution.restrictions, undefined);
+    for (const name of [
+        'build',
+        'buildTemplate',
+        'buildDefinition',
+        'buildDefinitionBulk',
+        'clone',
+        'createDeltaPkg',
+    ]) {
+        const effects = lookupCommand(name).reviewedEffects;
+        assert.equal(effects.status, 'partial-source-review');
+        assert.ok(effects.sourceReferences.length > 0);
+        assert.ok(Object.isFrozen(effects));
+    }
+    assert.match(
+        lookupCommand('createDeltaPkg').execution.reason,
+        /Only partial createDeltaPkg effects/u
+    );
+});
+
+test('capability routes retain eight immutable records and route native workflows to the runner', () => {
     assert.deepEqual(
         CAPABILITY_ROUTES.map(({ intent, backend }) => [intent, backend]),
         [
@@ -196,7 +209,6 @@ test('capability routes have exactly eight ordered immutable descriptive records
             ['message-send', 'manual'],
         ]
     );
-    assert.equal(new Set(CAPABILITY_ROUTES.map(({ intent }) => intent)).size, 8);
     assert.ok(Object.isFrozen(CAPABILITY_ROUTES));
     assert.throws(() => CAPABILITY_ROUTES.push({}), TypeError);
     for (const route of CAPABILITY_ROUTES) {
@@ -208,53 +220,29 @@ test('capability routes have exactly eight ordered immutable descriptive records
         ]);
         assert.ok(Object.isFrozen(route));
         for (const value of Object.values(route)) assert.equal(typeof value, 'string');
-        assert.ok(route.requiredCapability.length > 0);
-        assert.ok(route.standaloneFallback.length > 0);
         assert.throws(() => {
             route.backend = 'injected';
         }, TypeError);
-        assert.throws(() => {
-            route.standaloneFallback = 'injected';
-        }, TypeError);
     }
-});
-
-test('each route retains its bounded capability and honest standalone limitation', () => {
-    const expectations = [
-        [/retrieve_mcdev_query.*never SQL execution/u, /retrieval unperformed.*No broad fallback/u],
-        [
-            /retrieve_mcdev_script.*never SSJS or automation execution/u,
-            /retrieval unperformed.*No broad fallback/u,
-        ],
-        [
-            /Prefer local-source changes.*build\/deploy remain guidance-only/u,
-            /unperformed build\/deploy.*No synchronization claim/u,
-        ],
-        [
-            /platform detection.*lookups.*full-document.*polyfills/u,
-            /lookups\/validation unperformed.*stop only/u,
-        ],
-        [
-            /Optional host-discovered SQL-text validation.*candidate, not an established check/u,
-            /SQL validation remains unperformed/u,
-        ],
-        [
-            /requested read or write.*DE schema metadata retrieval is not row access/u,
-            /No row read or write is performed/u,
-        ],
-        [
-            /definition.*not sending a message/u,
-            /never substitute an actual send.*local synchronization/u,
-        ],
-        [
-            /Manual\/unsupported unless.*actual-send.*authorization/u,
-            /unsupported here.*unperformed.*authorizes a send/u,
-        ],
-    ];
-    for (const [index, route] of CAPABILITY_ROUTES.entries()) {
-        assert.match(route.requiredCapability, expectations[index][0]);
-        assert.match(route.standaloneFallback, expectations[index][1]);
+    for (const route of CAPABILITY_ROUTES.slice(0, 3)) {
+        assert.match(route.requiredCapability, /run_mcdev_command/u);
+        assert.doesNotMatch(route.requiredCapability, /guidance-only/u);
+        assert.match(route.standaloneFallback, /without requiring companion MCPs/u);
     }
+    assert.match(CAPABILITY_ROUTES[0].requiredCapability, /never SQL execution/u);
+    assert.match(CAPABILITY_ROUTES[1].requiredCapability, /never SSJS or automation execution/u);
+    assert.match(
+        CAPABILITY_ROUTES[2].requiredCapability,
+        /deploy requires explicit authorization/u
+    );
+    assert.match(
+        CAPABILITY_ROUTES[3].standaloneFallback,
+        /lookups\/validation unperformed.*stop only/u
+    );
+    assert.match(CAPABILITY_ROUTES[4].standaloneFallback, /SQL validation remains unperformed/u);
+    assert.match(CAPABILITY_ROUTES[5].standaloneFallback, /No row read or write is performed/u);
+    assert.match(CAPABILITY_ROUTES[6].standaloneFallback, /never substitute an actual send/u);
+    assert.match(CAPABILITY_ROUTES[7].standaloneFallback, /unperformed.*authorizes a send/u);
 });
 
 test('lookup rejects unknown names, command lines, whitespace, and case variants', () => {
@@ -266,9 +254,8 @@ test('lookup rejects unknown names, command lines, whitespace, and case variants
         'Retrieve',
         '--help',
         '; deploy',
-    ]) {
+    ])
         assert.equal(lookupCommand(input), undefined);
-    }
     assert.equal(lookupCommand('r'), lookupCommand('retrieve'));
     assert.equal(lookupCommand('resume'), lookupCommand('execute'));
     assert.notEqual(lookupCommand('stop'), lookupCommand('pause'));

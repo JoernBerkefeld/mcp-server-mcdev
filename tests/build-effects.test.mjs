@@ -57,7 +57,7 @@ test('four immutable build records retain canonical/alias identity and installed
         assert.equal(effects.approved, undefined);
         assert.equal(effects.argv, undefined);
     }
-    assert.equal(lookupCommand('bdb').execution.status, 'guidance-only');
+    assert.equal(lookupCommand('bdb').execution.status, 'partially-executable');
 });
 
 test('bulk selection, list cardinality, delegated builds and purge remain source-grounded', () => {
@@ -292,7 +292,7 @@ test('template dependency retrieval broadens types only after opt-in or confirma
         'not an exhaustive transitive audit',
     ]);
     assert.equal(effects.executionEnabled, undefined);
-    assert.equal(lookupCommand('bt').execution.status, 'guidance-only');
+    assert.equal(lookupCommand('bt').execution.status, 'partially-executable');
 });
 
 test('dependency caches read folders and shared assets using POST query, not create', () => {

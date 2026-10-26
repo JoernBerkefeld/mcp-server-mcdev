@@ -3,6 +3,30 @@ import { test } from 'node:test';
 import { validateTempEnvironment, createNativeEnvironment } from '../dist/temp-environment.js';
 
 // Pure policy inputs only: never mutate real temp configuration or create unsafe fixtures.
+test('child environment honors native HOME and PATH casing without introducing POSIX aliases', () => {
+    const source = Object.freeze({
+        HOME: '/home/demo',
+        home: '/wrong-home',
+        PATH: '/usr/bin',
+        Path: '/wrong-bin',
+        TMPDIR: '/tmp',
+        tmpdir: '/wrong-temp',
+    });
+    assert.deepEqual(createNativeEnvironment(source, '/tmp', 'linux'), {
+        HOME: '/home/demo',
+        PATH: '/usr/bin',
+        TMPDIR: '/tmp',
+        NO_COLOR: '1',
+    });
+    assert.deepEqual(
+        createNativeEnvironment({ Home: 'C:/Users/demo', Path: 'C:/bin' }, 'C:/Temp', 'win32'),
+        {
+            HOME: 'C:/Users/demo',
+            PATH: 'C:/bin',
+            NO_COLOR: '1',
+        }
+    );
+});
 test('native temp policy accepts custom Windows drives and independent configured variables', () => {
     const source = Object.freeze({
         TEMP: String.raw`C:\Users\demo\AppData\Local\Temp`,

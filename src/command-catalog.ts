@@ -26,25 +26,25 @@ export const CAPABILITY_ROUTES: readonly CapabilityRoute[] = Object.freeze(
             intent: 'query-metadata-retrieve',
             backend: 'mcdev',
             requiredCapability:
-                'retrieve_mcdev_query: exact-key query metadata retrieval under the existing Windows/mcdev 10.1.0 restrictions; never SQL execution.',
+                'run_mcdev_command with retrieve: native query metadata selectors and flags, with explicit target and choices; never SQL execution.',
             standaloneFallback:
-                'Use the existing restricted native tool when its prerequisites hold; otherwise provide documentation and guidance only, with retrieval unperformed. No broad fallback.',
+                'Use the general native runner for supported noninteractive retrieval without requiring companion MCPs; report missing checks and any blocked prompt-dependent invocation honestly.',
         },
         {
             intent: 'script-metadata-retrieve',
             backend: 'mcdev',
             requiredCapability:
-                'retrieve_mcdev_script: exact-key Script Activity metadata retrieval under the existing Windows/mcdev 10.1.0 restrictions; never SSJS or automation execution.',
+                'run_mcdev_command with retrieve: native Script Activity metadata selectors and flags, with explicit target and choices; never SSJS or automation execution.',
             standaloneFallback:
-                'Use the existing restricted native tool when its prerequisites hold; otherwise provide documentation and guidance only, with retrieval unperformed. No broad fallback.',
+                'Use the general native runner for supported noninteractive retrieval without requiring companion MCPs; report missing checks and any blocked prompt-dependent invocation honestly.',
         },
         {
             intent: 'metadata-source-change',
             backend: 'mcdev',
             requiredCapability:
-                'Qualified local metadata and editable-source inspection, followed by mcdev build/deploy guidance. Prefer local-source changes when both routes satisfy the task; build/deploy remain guidance-only.',
+                'Qualified local metadata and editable-source inspection, followed by run_mcdev_command for supported native build/deploy workflows. Prefer local-source changes when both routes satisfy the task; deploy requires explicit authorization, never an implicit follow-on.',
             standaloneFallback:
-                'Inspect supported local artifacts and provide documentation and non-executing previews; report missing language checks and unperformed build/deploy. No synchronization claim.',
+                'Use supported native retrieve/build/deploy without requiring companion MCPs; report missing language checks and distinguish useful native results from independently verified synchronization or success.',
         },
         {
             intent: 'language-validation',
@@ -225,11 +225,13 @@ export interface CommandCatalogEntry {
     readonly execution: {
         readonly status: 'guidance-only' | 'partially-executable';
         readonly reason: string;
-        readonly supportedCases?: readonly {
-            readonly metadataType: 'query' | 'script';
-            readonly tool: 'retrieve_mcdev_query' | 'retrieve_mcdev_script';
-        }[];
-        readonly restrictions?: string;
+        /** Native execution availability is conditional, not a second CLI parser or authorization. */
+        readonly nativeRunner?: {
+            readonly tool: 'run_mcdev_command';
+            readonly availability: 'noninteractive-cases';
+            readonly prerequisites: string;
+            readonly blockedCases: string;
+        };
         readonly remainingGuidanceOnlyScope?: string;
     };
 }
@@ -239,17 +241,36 @@ const execution = Object.freeze({
     reason: 'Declaration inventory only. No execution adapter exists; effects, prerequisites, and interactive prompts have not been reviewed.',
 });
 
-const retrieveExecution = Object.freeze({
+/** Descriptive coverage only; the execution adapter owns admission and native CLI parsing. */
+export const NATIVE_RUNNER_COMMANDS = Object.freeze([
+    'retrieve',
+    'deploy',
+    'build',
+    'buildTemplate',
+    'buildDefinition',
+    'buildDefinitionBulk',
+    'clone',
+    'explainTypes',
+    'badKeys',
+    'document',
+    'resolveId',
+    'getFilesToCommit',
+] as const);
+
+const nativeRunner = Object.freeze({
+    tool: 'run_mcdev_command' as const,
+    availability: 'noninteractive-cases' as const,
+    prerequisites:
+        'Ordinary host approval, an explicit project/credential/BU target where applicable, and explicit native choices sufficient for noninteractive execution. Use native selectors and flags; this catalog is not an argv allowlist or a second CLI parser.',
+    blockedCases:
+        'Prompt-dependent cases without explicit choices are blocked; do not promise every invocation, metadata type or flag combination. Output results require explainTypes --json or resolveId BU asset ID --json with supported logging options. getFilesToCommit execution is blocked because the installed CLI discards its result; use the local programmatic API. Native authentication, cleanup, validation hooks and type-specific effects still apply.',
+});
+
+const nativeExecution = Object.freeze({
     status: 'partially-executable' as const,
-    reason: 'Only exact-key query and script metadata retrieval have reviewed execution adapters; the full native retrieve signature is not executable through this catalog.',
-    supportedCases: Object.freeze([
-        Object.freeze({ metadataType: 'query' as const, tool: 'retrieve_mcdev_query' as const }),
-        Object.freeze({ metadataType: 'script' as const, tool: 'retrieve_mcdev_script' as const }),
-    ]),
-    restrictions:
-        'Windows and installed mcdev 10.1.0 only. Each tool accepts exactly workspaceRoot, credential, businessUnit and key: a canonical absolute project root, exact credential-qualified BU and one literal external key. Fresh preparation, reviewed configuration/runtime restrictions and caller-managed project/path quiescence are required; no arbitrary type, argv, flags or broad selectors.',
-    remainingGuidanceOnlyScope:
-        'All other metadata types and retrieve selectors/options, including whole-type, whole-BU, wildcard, name/ID and fallback retrieval, remain guidance-only. Catalog listing/lookup never launches a process, authorizes execution or supplies an argv allowlist.',
+    reason: 'Native noninteractive cases are available through run_mcdev_command; partial reviewed effects do not establish all transitive behavior or guarantee success.',
+    nativeRunner,
+    remainingGuidanceOnlyScope: nativeRunner.blockedCases,
 });
 
 // These are declarations, not executable command lines or an argv allowlist.
@@ -309,23 +330,19 @@ const catalog: readonly CommandCatalogEntry[] = Object.freeze(
                 : signature === 'clone'
                   ? {
                         reviewedEffects: cloneEffects,
-                        execution: Object.freeze({
-                            status: 'guidance-only' as const,
-                            reason: 'No execution adapter exists. Only partial clone effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
-                        }),
+                        execution: nativeExecution,
                     }
                   : signature.split(' ')[0] in BUILD_EFFECTS
                     ? {
                           reviewedEffects:
                               BUILD_EFFECTS[signature.split(' ')[0] as keyof typeof BUILD_EFFECTS],
-                          execution: Object.freeze({
-                              status: 'guidance-only' as const,
-                              reason: 'No execution adapter exists. Only partial build-family effects have been reviewed; transitive effects and unattended prerequisites remain unverified.',
-                          }),
+                          execution: nativeExecution,
                       }
                     : {
-                          execution: signature.startsWith('retrieve ')
-                              ? retrieveExecution
+                          execution: (NATIVE_RUNNER_COMMANDS as readonly string[]).includes(
+                              signature.split(' ')[0]
+                          )
+                              ? nativeExecution
                               : execution,
                       }),
         })

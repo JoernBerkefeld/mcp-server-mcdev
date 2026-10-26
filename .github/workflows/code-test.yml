@@ -8,12 +8,13 @@ on:
 
 jobs:
     lintandTesting:
-        runs-on: ubuntu-latest
+        runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
             matrix:
                 node: ['22.22.2', '24.15.0', 24, 25]
-        name: lint & test w/ node v${{ matrix.node }}
+                os: [ubuntu-latest, windows-latest, macos-latest]
+        name: lint & test on ${{ matrix.os }} w/ node v${{ matrix.node }}
         permissions:
             contents: read
 

@@ -61,10 +61,14 @@ export function createNativeEnvironment(
         'programdata',
         'homedrive',
         'homepath',
+        'home',
     ]);
     const env: NodeJS.ProcessEnv = {};
     for (const [name, value] of Object.entries(source)) {
-        if (allowed.has(name.toLowerCase())) env[name.toUpperCase()] = value;
+        const normalized = name.toUpperCase();
+        if (allowed.has(name.toLowerCase()) && (platform === 'win32' || name === normalized)) {
+            env[normalized] = value;
+        }
     }
     env.NO_COLOR = '1';
     return env;

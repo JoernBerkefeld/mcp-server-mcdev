@@ -60,14 +60,11 @@ test(
         try {
             await client.connect(transport);
             const { tools } = await client.listTools();
-            assert.equal(tools.length, 22);
+            assert.equal(tools.length, 20);
             assert.deepEqual(
                 tools.map((entry) => entry.name).toSorted(),
                 [
                     'diagnose_mcdev_retrieve_logs',
-                    'prepare_mcdev_query_retrieve',
-                    'retrieve_mcdev_query',
-                    'retrieve_mcdev_script',
                     'mcdev_search_docs',
                     'mcdev_get_doc_section',
                     'mcdev_explain_config_key',
@@ -85,7 +82,8 @@ test(
                     'resolve_mcdev_project_artifact',
                     'read_mcdev_artifact_source',
                     'preview_mcdev_project_command',
-                    'render_mcdev_query_definition',
+                    'run_mcdev_command',
+                    'reconcile_mcdev_operation',
                 ].toSorted()
             );
             const tool = tools.find((entry) => entry.name === 'diagnose_mcdev_retrieve_logs');
