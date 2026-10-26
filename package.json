@@ -1,6 +1,6 @@
 {
     "name": "mcp-server-mcdev",
-    "version": "1.1.1",
+    "version": "2.0.0",
     "mcpName": "io.github.JoernBerkefeld/mcp-server-mcdev",
     "description": "Native mcdev workflows through AI: retrieve, build, deploy, command discovery and offline SFMC DevTools documentation.",
     "author": "JÃƒÂ¶rn Berkefeld",
