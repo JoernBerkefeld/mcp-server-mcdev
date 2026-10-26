@@ -45,7 +45,7 @@ function fixture(t) {
         path.join(runtime, 'package.json'),
         JSON.stringify({
             name: 'mcdev',
-            version: '10.1.0',
+            version: '10.1.1',
             type: 'module',
             bin: { mcdev: 'lib/cli.js' },
         })

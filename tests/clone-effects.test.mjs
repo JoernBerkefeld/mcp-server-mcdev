@@ -21,7 +21,7 @@ const effects = lookupCommand('clone').reviewedEffects;
 
 test('clone is an immutable version-pinned guidance record, not a new command or alias', () => {
     assert.equal(effects.reviewedVersion, JSON.parse(read('package.json')).version);
-    assert.equal(effects.reviewedVersion, '10.1.0');
+    assert.equal(effects.reviewedVersion, '10.1.1');
     assert.equal(effects.status, 'partial-source-review');
     assert.equal(listCommands().length, 31);
     assert.equal(listCommands().flatMap((entry) => entry.aliases).length, 26);

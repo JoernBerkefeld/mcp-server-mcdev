@@ -1,7 +1,7 @@
 import { BUILD_EFFECTS } from './build-effects.js';
 
 /** Factual declaration inventory; never imports or executes the mcdev CLI. */
-export const REVIEWED_MCDEV_VERSION = '10.1.0' as const;
+export const REVIEWED_MCDEV_VERSION = '10.1.1' as const;
 export const COMMAND_CATALOG_SOURCE = 'mcdev/lib/cli.js' as const;
 
 /** Static host routing guidance, not executable tools or connected-server availability. */
@@ -116,12 +116,12 @@ const deltaEffects = Object.freeze({
     sourceReferences: Object.freeze([
         Object.freeze({
             file: 'mcdev/lib/cli.js',
-            line: 774,
+            line: 777,
             anchor: "['createDeltaPkg [commitrange]', 'cdp'],",
         }),
         Object.freeze({
             file: 'mcdev/lib/index.js',
-            line: 174,
+            line: 176,
             anchor: 'const range = argv.commitrange || Util.OPTIONS.range;',
         }),
         Object.freeze({
@@ -144,15 +144,15 @@ const deltaEffects = Object.freeze({
             line: 747,
             anchor: '_generateDeleteInstructions(delta, sourceMarket, properties, targetMlName) {',
         }),
-        Object.freeze({ file: 'mcdev/lib/index.js', line: 1203, anchor: 'static async build(' }),
+        Object.freeze({ file: 'mcdev/lib/index.js', line: 1226, anchor: 'static async build(' }),
         Object.freeze({
             file: 'mcdev/lib/index.js',
-            line: 1475,
+            line: 1498,
             anchor: 'static async _reRetrieve(',
         }),
         Object.freeze({
             file: 'mcdev/lib/index.js',
-            line: 1569,
+            line: 1592,
             anchor: 'static async buildDefinitionBulk(listName, selectedTypes, nameArr) {',
         }),
         Object.freeze({
@@ -186,13 +186,13 @@ const cloneEffects = Object.freeze({
     sourceReferences: Object.freeze([
         ...BUILD_EFFECTS.build.sourceReferences,
         ...[
-            ['mcdev/lib/cli.js', 381, "['clone'],"],
+            ['mcdev/lib/cli.js', 382, "['clone'],"],
             [
                 'mcdev/lib/index.js',
-                1181,
+                1204,
                 'static async clone(businessUnitTemplate, businessUnitDefinition, typeKeyCombo) {',
             ],
-            ['mcdev/lib/index.js', 2462, 'static metadataToTypeKey('],
+            ['mcdev/lib/index.js', 2485, 'static metadataToTypeKey('],
             [
                 'mcdev/lib/util/cli.js',
                 156,
@@ -278,35 +278,35 @@ const declarations: readonly (readonly [signature: string, line: number, ...alia
     [
         ['retrieve [BU] [TYPE] [KEY]', 21, 'r'],
         ['deploy [BU] [TYPE] [KEY]', 94, 'd'],
-        ['init [credentialsName]', 252],
-        ['join', 264],
-        ['reloadBUs [credentialsName]', 269, 'rb', 'refreshBUs'],
-        ['badKeys [BU]', 282],
-        ['document <BU> <TYPE>', 295, 'doc'],
-        ['delete <BU> [TYPE] [KEY]', 315, 'del'],
-        ['resolveId <BU> <TYPE> <ID>', 352, 'rid'],
-        ['clone', 381],
-        ['build', 441],
-        ['buildTemplate <BU> [TYPE] [KEY] [MARKET]', 538, 'bt'],
-        ['buildDefinition <BU> [TYPE] [FILENAME] [MARKET]', 619, 'bd'],
-        ['buildDefinitionBulk <LISTNAME> [TYPE] [FILENAME]', 699, 'bdb'],
-        ['selectTypes', 751, 'st'],
-        ['explainTypes', 760, 'et'],
-        ['createDeltaPkg [commitrange]', 774, 'cdp'],
-        ['getFilesToCommit <BU> <TYPE> <KEY>', 841, 'fc'],
-        ['refresh <BU> [TYPE] [KEY]', 865, 're'],
-        ['execute <BU> [TYPE] [KEY]', 899, 'exec', 'start', 'resume'],
-        ['publish <BU> [TYPE] [KEY]', 953, 'activate'],
-        ['validate <BU> [TYPE] [KEY]', 1000],
-        ['schedule <BU> [TYPE] [KEY]', 1041, 'sched'],
-        ['pause <BU> [TYPE] [KEY]', 1089, 'p'],
-        ['stop <BU> [TYPE] [KEY]', 1137],
-        ['audit <BU>', 1185],
-        ['fixKeys <BU> [TYPE] [KEY]', 1214, 'fx'],
-        ['replaceContentBlock', 1283, 'rcb'],
-        ['describeSoap <TYPE>', 1355, 'describe', 'soap'],
-        ['migrate [BU]', 1379],
-        ['upgrade', 1393, 'up'],
+        ['init [credentialsName]', 253],
+        ['join', 265],
+        ['reloadBUs [credentialsName]', 270, 'rb', 'refreshBUs'],
+        ['badKeys [BU]', 283],
+        ['document <BU> <TYPE>', 296, 'doc'],
+        ['delete <BU> [TYPE] [KEY]', 316, 'del'],
+        ['resolveId <BU> <TYPE> <ID>', 353, 'rid'],
+        ['clone', 382],
+        ['build', 443],
+        ['buildTemplate <BU> [TYPE] [KEY] [MARKET]', 541, 'bt'],
+        ['buildDefinition <BU> [TYPE] [FILENAME] [MARKET]', 622, 'bd'],
+        ['buildDefinitionBulk <LISTNAME> [TYPE] [FILENAME]', 702, 'bdb'],
+        ['selectTypes', 754, 'st'],
+        ['explainTypes', 763, 'et'],
+        ['createDeltaPkg [commitrange]', 777, 'cdp'],
+        ['getFilesToCommit <BU> <TYPE> <KEY>', 844, 'fc'],
+        ['refresh <BU> [TYPE] [KEY]', 868, 're'],
+        ['execute <BU> [TYPE] [KEY]', 902, 'exec', 'start', 'resume'],
+        ['publish <BU> [TYPE] [KEY]', 956, 'activate'],
+        ['validate <BU> [TYPE] [KEY]', 1003],
+        ['schedule <BU> [TYPE] [KEY]', 1044, 'sched'],
+        ['pause <BU> [TYPE] [KEY]', 1092, 'p'],
+        ['stop <BU> [TYPE] [KEY]', 1140],
+        ['audit <BU>', 1188],
+        ['fixKeys <BU> [TYPE] [KEY]', 1217, 'fx'],
+        ['replaceContentBlock', 1286, 'rcb'],
+        ['describeSoap <TYPE>', 1358, 'describe', 'soap'],
+        ['migrate [BU]', 1382],
+        ['upgrade', 1396, 'up'],
     ];
 
 const catalog: readonly CommandCatalogEntry[] = Object.freeze(

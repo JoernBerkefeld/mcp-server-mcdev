@@ -69,11 +69,11 @@ export const RETRIEVE_DEPLOY_EFFECTS: readonly CommandEffects[] = Object.freeze(
         ]),
         sourceReferences: sources([
             ['lib/cli.js', 21, 91],
-            ['lib/index.js', 389, 620],
+            ['lib/index.js', 412, 643],
             ['lib/Retriever.js', 55, 196],
             ['lib/metadataTypes/MetadataType.js', 2993, 3070],
             ['lib/metadataTypes/MetadataType.js', 1648, 1665],
-            ['lib/cli.js', 1422, 1428],
+            ['lib/cli.js', 1424, 1430],
             ['lib/util/cli.js', 156, 224],
         ]),
     }),
@@ -93,12 +93,12 @@ export const RETRIEVE_DEPLOY_EFFECTS: readonly CommandEffects[] = Object.freeze(
         remoteEffects: Object.freeze([
             'Reads target metadata/dependencies; creates or updates metadata and may create dependency folders. Hooks and validation can add effects beyond the selected item; this is not an exact remote change set.',
             'refresh on updated assets may refresh related active triggered sends; execute may run deployed automations; schedule may start automation schedules. Automation notification updates and post-deploy re-retrieval can occur without these flags.',
-            'fixShared applies after parent-BU shared DataExtension updates: prompts for child BUs, reads attribute sets and temporarily adds/removes fields to repair child data models; scope can cross the selected BU.',
+            'fixShared applies after parent-BU shared DataExtension updates: selects child BUs from native string choices or a prompt, reads attribute sets and temporarily adds/removes fields to repair child data models; scope can cross the selected BU.',
         ]),
         validation,
         interaction:
             interaction +
-            ' fixShared boolean can still prompt with skipInteraction: bypass requires nonempty string preselection in the native programmatic path, not the CLI boolean declaration.',
+            ' fixShared is a native string option accepting comma-separated child BU names or *. With skipInteraction, invalid names or an empty child selection fail instead of prompting; without skipInteraction, native child selection can still prompt.',
         declaredOptions: Object.freeze([
             'metadata',
             'keySuffix',
@@ -122,18 +122,18 @@ export const RETRIEVE_DEPLOY_EFFECTS: readonly CommandEffects[] = Object.freeze(
             'fix',
         ]),
         sourceReferences: sources([
-            ['lib/cli.js', 94, 249],
+            ['lib/cli.js', 94, 250],
             ['lib/Deployer.js', 69, 379],
             ['lib/metadataTypes/MetadataType.js', 149, 163],
             ['lib/metadataTypes/MetadataType.js', 790, 978],
             ['lib/metadataTypes/MetadataType.js', 2993, 3070],
             ['lib/metadataTypes/MetadataType.js', 1648, 1665],
-            ['lib/cli.js', 1422, 1428],
+            ['lib/cli.js', 1424, 1430],
             ['lib/util/cli.js', 156, 224],
             ['lib/metadataTypes/Asset.js', 823, 833],
             ['lib/metadataTypes/Asset.js', 976, 1013],
             ['lib/metadataTypes/Automation.js', 1134, 1205],
-            ['lib/metadataTypes/DataExtension.js', 385, 655],
+            ['lib/metadataTypes/DataExtension.js', 385, 672],
         ]),
     }),
 ]);
@@ -258,7 +258,7 @@ export function previewRetrieveDeploy(input: unknown): EffectsPreview {
     }
     if (options.fixShared) {
         warnings.push(
-            'fixShared can prompt even with skipInteraction and mutates child-BU data models outside this BU.'
+            'fixShared without explicit string child choices fails with skipInteraction; otherwise child selection can prompt, and repair mutates child-BU data models outside this BU.'
         );
     }
     if (options.refresh || options.execute || options.schedule) {

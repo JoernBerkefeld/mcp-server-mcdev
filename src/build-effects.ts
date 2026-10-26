@@ -1,19 +1,19 @@
-/** Partial mcdev 10.1.0 source review only; no native modules or hooks are loaded. */
+/** Partial mcdev 10.1.1 source review only; no native modules or hooks are loaded. */
 const sourceReferences = Object.freeze(
     [
-        ['mcdev/lib/cli.js', 441, "['build'],"],
-        ['mcdev/lib/cli.js', 538, "['buildTemplate <BU> [TYPE] [KEY] [MARKET]', 'bt'],"],
-        ['mcdev/lib/cli.js', 619, "['buildDefinition <BU> [TYPE] [FILENAME] [MARKET]', 'bd'],"],
-        ['mcdev/lib/index.js', 1203, 'static async build('],
+        ['mcdev/lib/cli.js', 443, "['build'],"],
+        ['mcdev/lib/cli.js', 541, "['buildTemplate <BU> [TYPE] [KEY] [MARKET]', 'bt'],"],
+        ['mcdev/lib/cli.js', 622, "['buildDefinition <BU> [TYPE] [FILENAME] [MARKET]', 'bd'],"],
+        ['mcdev/lib/index.js', 1226, 'static async build('],
         [
             'mcdev/lib/index.js',
-            1294,
+            1317,
             'static async buildTemplate(businessUnit, selectedTypes, keyArr, marketArr, filter) {',
         ],
-        ['mcdev/lib/index.js', 1475, 'static async _reRetrieve('],
+        ['mcdev/lib/index.js', 1498, 'static async _reRetrieve('],
         [
             'mcdev/lib/index.js',
-            1524,
+            1547,
             'static async buildDefinition(businessUnit, selectedTypes, nameArr, marketArr) {',
         ],
         [
@@ -59,7 +59,7 @@ const sourceReferences = Object.freeze(
 
 const shared = {
     status: 'partial-source-review' as const,
-    reviewedVersion: '10.1.0' as const,
+    reviewedVersion: '10.1.1' as const,
     markets:
         'For standalone template/definition commands, positional MARKET wins over --market. Builder merges market objects in array order, with later values winning; first market __clone__ skips substitutions. CLI --metadata combos replace positional TYPE and KEY/FILENAME selection.',
     destinations:
@@ -74,10 +74,10 @@ const shared = {
 const bulkSourceReferences = Object.freeze([
     ...sourceReferences,
     ...[
-        ['mcdev/lib/cli.js', 699, "['buildDefinitionBulk <LISTNAME> [TYPE] [FILENAME]', 'bdb'],"],
+        ['mcdev/lib/cli.js', 702, "['buildDefinitionBulk <LISTNAME> [TYPE] [FILENAME]', 'bdb'],"],
         [
             'mcdev/lib/index.js',
-            1569,
+            1592,
             'static async buildDefinitionBulk(listName, selectedTypes, nameArr) {',
         ],
         [
@@ -102,13 +102,13 @@ const templateSourceReferences = Object.freeze([
     ...[
         [
             'mcdev/lib/index.js',
-            1004,
+            1027,
             'static async addDependentCbReferences(businessUnit, typeKeyList) {',
         ],
-        ['mcdev/lib/index.js', 1101, 'static async addDependencies(businessUnit, typeKeyList) {'],
+        ['mcdev/lib/index.js', 1124, 'static async addDependencies(businessUnit, typeKeyList) {'],
         [
             'mcdev/lib/index.js',
-            516,
+            539,
             'static async #retrieveBU(cred, bu, selectedTypesArr, keys, changelogOnly) {',
         ],
         [
@@ -154,7 +154,7 @@ const templateSourceReferences = Object.freeze([
         ],
         [
             'mcdev/lib/metadataTypes/DataExtension.js',
-            1579,
+            1589,
             'static async handleNotFoundDependencies(notFound) {',
         ],
     ].map(([file, line, anchor]) =>

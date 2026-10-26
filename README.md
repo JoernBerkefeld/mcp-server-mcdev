@@ -6,7 +6,7 @@ Pair with **[mcp-server-sfmc](https://www.npmjs.com/package/mcp-server-sfmc)** f
 
 ## Requirements
 
-Node.js `^22.22.2 || >=24.15.0` is required. This server uses the npm `mcdev` 10.1.0 release line; no separate global mcdev installation is required.
+Node.js `^22.22.2 || >=24.15.0` is required. This server uses the npm `mcdev` 10.1.1 release line; no separate global mcdev installation is required.
 
 ## MCP Registry
 
@@ -71,7 +71,7 @@ Other native workflows use the same envelope:
 - Additional native commands: `badKeys` and `document` write native local reports. `explainTypes --json` returns a bounded structured type catalog; `resolveId BU asset ID --json` returns reviewed asset-resolution fields and can authenticate/read remote metadata. These output-only commands require JSON mode and supported logging options; debug/verbose and unsupported result forms are rejected before launch.
 - `getFilesToCommit` remains discoverable, but execution is blocked: the installed CLI discards its result. Use mcdev's local programmatic API instead. Declaration inventory is not executable coverage.
 
-Supply missing choices before launch. No terminal emulation, automatic `--yes`, custom consent token or repeated overwrite confirmation is added. Normal MCP-host approval applies to the actual operation. Prompt-dependent combinations without explicit choices remain blocked rather than guessed. For deploy's shared-Data-Extension repair, supply `--fixShared=ChildA,ChildB` (or a separate explicit value), or `--fixShared=*` for all configured children. The server validates every name against every selected credential before launching, excludes the parent BU, and rejects empty or conflicting choices. A small isolated bridge seeds this choice through installed mcdev's public API, then runs its unchanged CLI; no unpublished dependency or runtime patch is required. Use `--no-fixShared` to disable repair. Bare `--fixShared` cannot supply the required choice.
+Supply missing choices before launch. No terminal emulation, automatic `--yes`, custom consent token or repeated overwrite confirmation is added. Normal MCP-host approval applies to the actual operation. Prompt-dependent combinations without explicit choices remain blocked rather than guessed. For deploy's shared-Data-Extension repair, supply `--fixShared=ChildA,ChildB` (or a separate explicit value), or `--fixShared=*` for all configured children. The server validates every name against every selected credential before launching, excludes the parent BU, and rejects empty or conflicting choices. The installed mcdev 10.1.1 CLI handles the explicit selection directly; no bridge, unpublished dependency or runtime patch is required. Use `--no-fixShared` to disable repair. Bare `--fixShared` cannot supply the required choice.
 
 Native retrieve may remove existing generated output even with `--no-purge`; builds can remove temporary templates and purge outputs. Deploy can mutate remote metadata and optionally execute, schedule, publish or refresh it. Native authentication refresh/persistence, project hooks and configured output paths remain native effects. Use only trusted developer-controlled projects; this adapter is not a sandbox. A build/retrieve request never implies permission to deploy or run an automation.
 
@@ -150,7 +150,7 @@ Then use `"command": "mcp-server-mcdev", "args": []` (or the binary name from th
 
 `diagnose_mcdev_retrieve_logs` is a dedicated read-only exception to the prohibition on general log-content readers. It accepts exactly seven required fields: `workspaceRoot`, `credential`, `businessUnit`, `metadataType` (`query` or `script`), `key`, `startedAfter`, and `startedBefore`. Use exact configured aliases and one literal key. Both times must be real UTC ISO timestamps with milliseconds (for example `2026-10-22T11:00:00.000Z`), ordered inclusively and no more than 24 hours apart. No caller-supplied paths, flags or budget overrides are accepted.
 
-Historical correlation supports only mcdev **10.1.0**, with canonical joined command spelling `retrieve credential/BU query key` or `retrieve credential/BU script key`. Each credential, BU and key must match `[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}`. Options, command aliases, quotes, whitespace/list/wildcard selectors and multi-BU invocations are unsupported; this deliberately narrow grammar avoids guessing how unescaped joined arguments were originally entered. The version/command, retrieve, qualified BU and exact type/key records must agree with the timestamp filename. Modification time alone cannot select a log.
+Historical correlation supports mcdev **10.1.0 and 10.1.1**, with canonical joined command spelling `retrieve credential/BU query key` or `retrieve credential/BU script key`. Each credential, BU and key must match `[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}`. Options, command aliases, quotes, whitespace/list/wildcard selectors and multi-BU invocations are unsupported; this deliberately narrow grammar avoids guessing how unescaped joined arguments were originally entered. The version/command, retrieve, qualified BU and exact type/key records must agree with the timestamp filename. Modification time alone cannot select a log.
 
 Only normal timestamp-named `.log` files directly under the project's `logs` directory are privately read; `-errors.log` companions are excluded. Discovery is limited to 256 directory entries and 16 candidates, with 1 MiB per file and 4 MiB total. Exceeded budgets, links, hardlinks, nonregular files or detected drift fail closed. Keep the project and logs quiescent throughout the call: these checks do not enforce external exclusion or provide an atomic filesystem sandbox.
 
@@ -170,17 +170,18 @@ Ordinary `npm run bundle-wiki`, builds, hooks and prepublish reuse the committed
 npm run bundle-wiki -- --refresh
 ```
 
-For a reviewed or frozen source directory, set `SFMC_DEVTOOLS_WIKI` instead. Keep it set for subsequent builds, hooks and prepublish so every bundler invocation uses that same source:
+For a clean published or otherwise reviewed source directory, set `SFMC_DEVTOOLS_WIKI` and explicitly request refresh:
 
 ```bash
 export SFMC_DEVTOOLS_WIKI=/absolute/path/to/reviewed-wiki
-npm run bundle-wiki
-npm run build
+npm run bundle-wiki -- --refresh
 ```
 
-In PowerShell, use `$env:SFMC_DEVTOOLS_WIKI = 'F:\path\to\reviewed-wiki'`. A missing or empty explicitly selected source fails rather than silently falling back to another checkout.
+In PowerShell, use `$env:SFMC_DEVTOOLS_WIKI = 'F:\path\to\reviewed-wiki'`. Ordinary builds, hooks and prepublish do not read this source, even when the variable is set. A missing or empty refresh source fails rather than silently falling back to another checkout. Refresh conflicts with local annotations require exact old/proposed SHA-256 reconciliation through the exported `bundleWiki` API; there is no force-refresh CLI flag.
 
-The bundled baseline is the mcdev 10.1.0 wiki commit `d0f315d6a826fe7068494e2e46e8021e26ce0915` (a commit, not a wiki tag). Four pages retain explicitly pending/unreleased extension-bundled CLI and optional-Git annotations: Getting Started, Updating mcdev, Admin Commands, and Git-based deployments and CI/CD. These annotations are not claims that those features shipped with mcdev 10.1.0. Preserve or reconcile them explicitly when refreshing; copying the released wiki alone would discard them.
+The published wiki baseline is clean remote commit `6a87898ba811ba9f5ad3553e72cce97f128a8601` (a commit, not a wiki tag), refreshed for mcdev 10.1.1. `bundled/wiki-provenance.json` records the published page hashes, the exact refresh reconciliation, and separate final-byte hashes for six locally annotated pages. The source remains marked `not-reviewed`: importing a clean published snapshot does not endorse every upstream claim.
+
+Getting Started, Updating mcdev, Admin Commands, and Git-based deployments and CI/CD retain explicitly pending/unreleased extension-bundled CLI and optional-Git guidance. Templating Commands and Advanced Configuration retain local behavior/safety corrections. These annotations are not evidence that the pending VS Code extension shipped. The shared Data Extension selection documentation was imported from the published wiki; the initial-push fix and boolean `--purge` / `--no-purge` fixes are marked released based on [mcdev 10.1.1 release notes](https://github.com/Accenture/sfmc-devtools/releases/tag/v10.1.1). The published wiki still labels the purge fix as pending, so the bundle corrects that stale label locally. Preserve or explicitly reconcile all remaining annotations during future refreshes.
 
 ## License
 

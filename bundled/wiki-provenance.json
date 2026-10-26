@@ -1,27 +1,103 @@
 {
   "schemaVersion": 1,
   "source": {
-    "revision": "46b6c453f4d9e373a133e0c2b43e2f2af5812275",
-    "dirty": true,
+    "revision": "6a87898ba811ba9f5ad3553e72cce97f128a8601",
+    "dirty": false,
     "localReviewStatus": "not-reviewed"
   },
-  "mcdevVersion": "10.1.0",
+  "mcdevVersion": "10.1.1",
   "pages": {
-    "02.-Getting-Started.md": "50839d50edf3c11c93a25f8d9401873b418496b72911d23e6b65d7ed22c46083",
-    "03.-Updating-mcdev.md": "c71e69cc2b59b333ca2e3c4f95e5e1fafb9e51d4926371d54b6c6c1f7d7aa4f8",
+    "02.-Getting-Started.md": "8058957990bf5bf7cc8d97db717d2482ae27777549b7cc0758ae37dba9c65819",
+    "03.-Updating-mcdev.md": "2fe2a4e4c2dc053320a2e6ceb380c6b141cf849e9b8bcc82725f59dc30660cea",
     "03.a-~-Migrating-to-v10.md": "d0a6aa7cf0e3238847741fc9ae861e0e98df573b6f3c50ef8ede5153473c4867",
     "04.-Troubleshooting.md": "86f33fbef6255a73486f518ecb3bb8273c8149853b7fd1a65c0049a1ef359800",
     "05.-Metadata-Type-Support.md": "9e2e84a8ddab5ad700059d7e549906a0a75e35313012bc33dd0e2d2310ca59b8",
     "06.-Commands.md": "87f56aa147fec38bb74a99100d213de3e6d5f15c46d9df0d6f94d21bfc0adf90",
-    "06.a-~-Admin-Commands.md": "e75d0f2ef4bef4dec8379562cc910b925e92c43038c38340779f62a535b1d18e",
-    "06.b-~-Standard-Commands.md": "8c2fb952e362986a8b1ea33411750076aa58c1c327171e1cff0af9f94381c971",
-    "06.c-~-Templating-Commands.md": "12bc3735ec878765acdb2a6204eac7a91d0302c90acfc2da9a2793057af6541e",
-    "06.d-~-Git-based-deployments-and-CICD.md": "33282808ea68c3ce41f104e8b78799b46fe6def4a73b2af4c99e00fea6ab9fd1",
-    "07.-Advanced-Configuration.md": "cec1d2f026e72488c878051a3740e18cbda4ff31fae6241ebf4ea29da2d0ffcf",
+    "06.a-~-Admin-Commands.md": "8d757d8237e320b9dbd6a263e2bc4267baaaf5f283e41fb3412f498bd048e1f0",
+    "06.b-~-Standard-Commands.md": "0a785f12c73b1e605f3371ab9586468594fba95f4107f255759a48522ae4ceb5",
+    "06.c-~-Templating-Commands.md": "c4e981b79cbf7b537079e528f36ebf20564248b3d55291a1b46aaf22fdd4d01e",
+    "06.d-~-Git-based-deployments-and-CICD.md": "aae9910a90c12d7dd3fb9b4b80ba89f426499e2a73e8cb95b2a3222ced89fdd4",
+    "07.-Advanced-Configuration.md": "cdd35244c66828019b0883cd819895188ef1deac5118edbf7786a8b108842939",
     "08.-Metadata-specific-settings-&-options.md": "3e9e04fdf412fc5313009688c538cd280e7eec5dd5f74fc334b2914aec8c2198",
     "09.-Examples.md": "68096022e325f0901de01bc81bbc6ec8a3988bfcaf0cf6909c988f9fe602f7f1",
     "10.-Contribute.md": "9636877140bb907b2d96e3156cf544ea8352d6c247c1026fbfde85cf25545264",
     "Home.md": "9dbe6ca30381125bc6d75485f85559d2ed53a8d6479deed55db7e8c94cc39689",
     "_Footer.md": "64e3be27b0e18da99f9524fe997c047e8f2546201a567b1a8151402a13a1ed09"
+  },
+  "localAnnotations": {
+    "basis": "Published wiki baseline hashes remain in pages; annotated bundled bytes are recorded separately. Ordinary builds retain both inventories.",
+    "releaseEvidence": "https://github.com/Accenture/sfmc-devtools/releases/tag/v10.1.1",
+    "pages": {
+      "02.-Getting-Started.md": {
+        "sourceSha256": "8058957990bf5bf7cc8d97db717d2482ae27777549b7cc0758ae37dba9c65819",
+        "bundledSha256": "50839d50edf3c11c93a25f8d9401873b418496b72911d23e6b65d7ed22c46083",
+        "status": "pending-extension-and-local-guidance-retained",
+        "reconciledReleasedFixes": []
+      },
+      "03.-Updating-mcdev.md": {
+        "sourceSha256": "2fe2a4e4c2dc053320a2e6ceb380c6b141cf849e9b8bcc82725f59dc30660cea",
+        "bundledSha256": "c71e69cc2b59b333ca2e3c4f95e5e1fafb9e51d4926371d54b6c6c1f7d7aa4f8",
+        "status": "pending-extension-and-local-guidance-retained",
+        "reconciledReleasedFixes": []
+      },
+      "06.a-~-Admin-Commands.md": {
+        "sourceSha256": "8d757d8237e320b9dbd6a263e2bc4267baaaf5f283e41fb3412f498bd048e1f0",
+        "bundledSha256": "162563fae42e6e97002a56d9501966ba7a3ce49cfc8b136b0f366f17093d31c7",
+        "status": "pending-extension-and-local-guidance-retained",
+        "reconciledReleasedFixes": [
+          "10.1.1 initial push uses current branch"
+        ]
+      },
+      "06.c-~-Templating-Commands.md": {
+        "sourceSha256": "c4e981b79cbf7b537079e528f36ebf20564248b3d55291a1b46aaf22fdd4d01e",
+        "bundledSha256": "6d0f3f90c4c37d1bd8fe749e607b51f45f4bb18e6f9d852b48bab2d322132a3d",
+        "status": "local-behavior-corrections-retained",
+        "reconciledReleasedFixes": [
+          "10.1.1 boolean purge/no-purge parsing for clone and build"
+        ]
+      },
+      "06.d-~-Git-based-deployments-and-CICD.md": {
+        "sourceSha256": "aae9910a90c12d7dd3fb9b4b80ba89f426499e2a73e8cb95b2a3222ced89fdd4",
+        "bundledSha256": "33282808ea68c3ce41f104e8b78799b46fe6def4a73b2af4c99e00fea6ab9fd1",
+        "status": "pending-extension-and-local-guidance-retained",
+        "reconciledReleasedFixes": []
+      },
+      "07.-Advanced-Configuration.md": {
+        "sourceSha256": "cdd35244c66828019b0883cd819895188ef1deac5118edbf7786a8b108842939",
+        "bundledSha256": "cec1d2f026e72488c878051a3740e18cbda4ff31fae6241ebf4ea29da2d0ffcf",
+        "status": "local-behavior-corrections-retained",
+        "reconciledReleasedFixes": []
+      }
+    }
+  },
+  "refreshReconciliation": {
+    "02.-Getting-Started.md": {
+      "oldSha256": "50839d50edf3c11c93a25f8d9401873b418496b72911d23e6b65d7ed22c46083",
+      "proposedSha256": "8058957990bf5bf7cc8d97db717d2482ae27777549b7cc0758ae37dba9c65819"
+    },
+    "03.-Updating-mcdev.md": {
+      "oldSha256": "c71e69cc2b59b333ca2e3c4f95e5e1fafb9e51d4926371d54b6c6c1f7d7aa4f8",
+      "proposedSha256": "2fe2a4e4c2dc053320a2e6ceb380c6b141cf849e9b8bcc82725f59dc30660cea"
+    },
+    "06.a-~-Admin-Commands.md": {
+      "oldSha256": "e75d0f2ef4bef4dec8379562cc910b925e92c43038c38340779f62a535b1d18e",
+      "proposedSha256": "8d757d8237e320b9dbd6a263e2bc4267baaaf5f283e41fb3412f498bd048e1f0"
+    },
+    "06.b-~-Standard-Commands.md": {
+      "oldSha256": "8c2fb952e362986a8b1ea33411750076aa58c1c327171e1cff0af9f94381c971",
+      "proposedSha256": "0a785f12c73b1e605f3371ab9586468594fba95f4107f255759a48522ae4ceb5"
+    },
+    "06.c-~-Templating-Commands.md": {
+      "oldSha256": "12bc3735ec878765acdb2a6204eac7a91d0302c90acfc2da9a2793057af6541e",
+      "proposedSha256": "c4e981b79cbf7b537079e528f36ebf20564248b3d55291a1b46aaf22fdd4d01e"
+    },
+    "06.d-~-Git-based-deployments-and-CICD.md": {
+      "oldSha256": "33282808ea68c3ce41f104e8b78799b46fe6def4a73b2af4c99e00fea6ab9fd1",
+      "proposedSha256": "aae9910a90c12d7dd3fb9b4b80ba89f426499e2a73e8cb95b2a3222ced89fdd4"
+    },
+    "07.-Advanced-Configuration.md": {
+      "oldSha256": "cec1d2f026e72488c878051a3740e18cbda4ff31fae6241ebf4ea29da2d0ffcf",
+      "proposedSha256": "cdd35244c66828019b0883cd819895188ef1deac5118edbf7786a8b108842939"
+    }
   }
 }

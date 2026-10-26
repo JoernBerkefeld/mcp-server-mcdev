@@ -15,7 +15,7 @@ const effects = lookupCommand('createDeltaPkg').reviewedEffects;
 // Any drift requires a source review; no mcdev module or handler is loaded here.
 test('reviewed effects are pinned to the installed version and exact native source anchors', () => {
     assert.equal(effects.reviewedVersion, JSON.parse(read('package.json')).version);
-    assert.equal(effects.reviewedVersion, '10.1.0');
+    assert.equal(effects.reviewedVersion, '10.1.1');
     assert.equal(effects.sourceReferences.length, 12);
     for (const { file, line, anchor } of effects.sourceReferences) {
         assert.ok(file.startsWith('mcdev/lib/'));

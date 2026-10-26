@@ -58,7 +58,7 @@ test('stdio exposes native execution with host-controlled approval and actionabl
         const evidence = JSON.parse(executed.content[0].text);
         assert.equal(evidence.outcome, 'exited');
         assert.equal(evidence.process.exitCode, 0);
-        assert.equal(evidence.runtimeVersion, '10.1.0');
+        assert.equal(evidence.runtimeVersion, '10.1.1');
         assert.equal(evidence.remoteCompletenessVerified, false);
     } finally {
         await client.close();

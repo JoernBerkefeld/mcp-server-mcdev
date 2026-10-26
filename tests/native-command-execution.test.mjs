@@ -25,20 +25,15 @@ fs.writeFileSync(
     path.join(runtimeRoot, 'package.json'),
     JSON.stringify({
         name: 'mcdev',
-        version: '10.1.0',
+        version: '10.1.1',
         type: 'module',
         bin: { mcdev: 'lib/cli.js' },
     })
 );
 const cliEntry = path.join(runtimeRoot, 'lib', 'cli.js');
 fs.writeFileSync(
-    path.join(runtimeRoot, 'lib', 'index.js'),
-    `export default { setOptions(options) { globalThis.nativeChoices = options; } };\n`
-);
-fs.writeFileSync(
     cliEntry,
     `import fs from 'node:fs';
-if(globalThis.nativeChoices)fs.writeFileSync('choices.json',JSON.stringify(globalThis.nativeChoices));
 fs.writeFileSync('argv.json',JSON.stringify(process.argv.slice(2)));
 if(process.argv.includes('hang'))setInterval(()=>{},1000);
 else if(process.argv.includes('explainTypes')) { const {default:Mcdev}=await import(${JSON.stringify(new URL('../node_modules/mcdev/lib/index.js', import.meta.url).href)}); Mcdev.setOptions({json:true,silent:true}); console.log(JSON.stringify(Mcdev.explainTypes())); }
@@ -203,11 +198,12 @@ test('wildcards, build selectors and bulk configured destinations preserve exact
     }
 });
 
-test('explicit shared children use isolated bridge choices and remove only choice tokens', async () => {
+test('explicit shared children reach the direct CLI with unchanged tokens', async () => {
     for (const choice of [
         ['--fixShared=BU,Target'],
         ['--fixShared', 'BU,Target'],
         ['--fixShared=*'],
+        ['--fixShared', '*'],
     ]) {
         const args = ['--publish', ...choice, 'cred/BU', 'query', 'key: with spaces'];
         const result = await executeNativeCommand(
@@ -219,15 +215,9 @@ test('explicit shared children use isolated bridge choices and remove only choic
         assert.equal(result.process.exitCode, 0);
         assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'argv.json'), 'utf8')), [
             'deploy',
-            '--publish',
-            'cred/BU',
-            'query',
-            'key: with spaces',
+            '--skipInteraction=true',
+            ...args,
         ]);
-        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'choices.json'), 'utf8')), {
-            fixShared: choice.at(-1).split('=').at(-1),
-            skipInteraction: true,
-        });
     }
 });
 
@@ -237,6 +227,8 @@ test('invalid shared choices reject before child launch without exposing configu
         [config, ['cred/BU', '--fixShared=SECRET_CHILD']],
         [config, ['cred/BU', '--fixShared=BU,SECRET_CHILD']],
         [config, ['cred/BU', '--fixShared=']],
+        [config, ['cred/BU', '--fixShared=false']],
+        [config, ['cred/BU', '--fixShared=BU', '--no-yes']],
         [config, ['cred/BU', '--fixShared=BU,']],
         [
             { credentials: { cred: { businessUnits: { _ParentBU_: '100' } } } },
@@ -309,7 +301,9 @@ test('wildcard deployment checks shared children for every selected credential',
         assert.equal(result.process.exitCode, 0);
         assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'argv.json'), 'utf8')), [
             'deploy',
+            '--skipInteraction=true',
             '*',
+            '--fixShared=BU',
         ]);
     } finally {
         fs.writeFileSync(configPath, JSON.stringify(config));

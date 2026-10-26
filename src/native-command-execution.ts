@@ -55,7 +55,7 @@ function validateProjectSelections(
             'market',
             ...(command === 'retrieve' ? ['like'] : []),
             ...(command === 'deploy'
-                ? ['keySuffix', 'ks', 'changeKeyField', 'ckf', 'changeKeyValue', 'ckv']
+                ? ['keySuffix', 'ks', 'changeKeyField', 'ckf', 'changeKeyValue', 'ckv', 'fixShared']
                 : []),
         ],
         array: [
@@ -91,7 +91,6 @@ function validateProjectSelections(
                 : []),
             ...(command === 'deploy'
                 ? [
-                      'fixShared',
                       'autoMidSuffix',
                       'fromRetrieve',
                       'fr',
@@ -120,6 +119,7 @@ function validateProjectSelections(
             ...(['build', 'clone', 'buildTemplate'].includes(command)
                 ? ['dependencies', 'D', 'retrieve', 'r']
                 : []),
+            ...(['build', 'clone'].includes(command) ? ['purge'] : []),
             ...(['build', 'buildTemplate'].includes(command) ? ['shareAsset'] : []),
             ...(command === 'clone' ? ['skipValidation', 'sv'] : []),
             ...(['buildDefinition', 'buildDefinitionBulk'].includes(command)
@@ -267,8 +267,11 @@ export async function executeNativeCommand(
         const process = await runNativeProcess(
             {
                 projectRoot: root,
-                args: [command.command, ...command.nativeArgs],
-                ...(command.nativeChoices ? { nativeChoices: command.nativeChoices } : {}),
+                args: [
+                    command.command,
+                    ...(command.nativeChoices ? ['--skipInteraction=true'] : []),
+                    ...command.nativeArgs,
+                ],
             },
             {
                 signal: lifetime.signal,

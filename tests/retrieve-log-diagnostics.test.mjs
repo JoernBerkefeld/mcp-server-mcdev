@@ -34,7 +34,7 @@ const read = (file) =>
     fs.readFileSync(new URL(`../node_modules/mcdev/${file}`, import.meta.url), 'utf8');
 
 test('reviewed installed source anchors remain version-bound without native imports', () => {
-    assert.equal(JSON.parse(read('package.json')).version, '10.1.0');
+    assert.equal(JSON.parse(read('package.json')).version, '10.1.1');
     for (const [file, anchor] of [
         ['lib/util/util.js', "Util.logFileName = new Date().toISOString().replaceAll(':', '.');"],
         ['lib/util/util.js', '`${info.timestamp} ${info.level}: ${info.message}`'],
@@ -60,6 +60,15 @@ test('reviewed installed source anchors remain version-bound without native impo
         ],
     ])
         assert.ok(read(file).includes(anchor), file);
+});
+
+test('both historical 10.1.0 and current 10.1.1 invocation headers remain supported', () => {
+    for (const version of ['10.1.0', '10.1.1']) {
+        for (const metadataType of ['query', 'script']) {
+            const lines = fixture(metadataType).map((line) => line.replace('10.1.0', version));
+            assert.equal(classify(lines, { metadataType }).status, 'matched');
+        }
+    }
 });
 
 test('filename UTC is strict, normal-log-only, and independent of local record clocks', () => {

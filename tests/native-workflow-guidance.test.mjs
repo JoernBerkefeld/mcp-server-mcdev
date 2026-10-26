@@ -21,7 +21,7 @@ test('guidance covers native choices, honest results, companion fallback and exp
         /explicit credential\/BU target.*explicit native choices/u,
         /do not replace it with a second CLI parser/u,
         /Prompt-dependent cases without explicit choices are blocked/u,
-        /--fixShared=ChildA,ChildB.*configured child selections are validated.*isolated native API bridge/u,
+        /--fixShared=ChildA,ChildB.*configured child selections are validated.*installed native CLI/u,
         /Missing companion.*do not block otherwise supported native work/u,
         /A useful result is not independently verified success/u,
         /zero exit code.*do not prove/u,

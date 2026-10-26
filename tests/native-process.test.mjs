@@ -13,7 +13,7 @@ const runRoot = fs.realpathSync.native(
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain synthetic run-owned fixtures; no recursive cleanup or native mcdev invocation.
-function fixture(args = ['synthetic-command', 'literal ; & value'], version = '10.1.0') {
+function fixture(args = ['synthetic-command', 'literal ; & value'], version = '10.1.1') {
     const projectRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(runRoot, 'project-')));
     const packageRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(runRoot, 'runtime-')));
     fs.mkdirSync(path.join(packageRoot, 'lib'));
@@ -104,93 +104,6 @@ test('transport prepends trusted CLI and forwards internal readonly argv without
     assert.equal(observed.env.NO_COLOR, '1');
 });
 
-test('native bridge seeds the CLI singleton without changing argv, cwd or environment isolation', async () => {
-    const f = fixture(Object.freeze(['deploy', 'credential/business-unit', 'folder ; & value']));
-    f.input.nativeChoices = Object.freeze({ fixShared: 'shared folder ; & literal' });
-    const parentArgv = [...process.argv];
-    const parentCwd = process.cwd();
-    const parentEnv = { ...process.env };
-    const result = await runNativeProcess(
-        f.input,
-        { signal: f.controller.signal, nativeCommandMode: true },
-        f.runtime
-    );
-    safe(result);
-    assert.equal(result.outcome, 'exited');
-    assert.equal(result.exitCode, 7);
-    assert.equal(result.directChildClosed, true);
-    assert.deepEqual(
-        JSON.parse(fs.readFileSync(path.join(f.input.projectRoot, 'options.json'), 'utf8')),
-        { fixShared: 'shared folder ; & literal', skipInteraction: true, ordinary: 'cli' }
-    );
-    const observed = JSON.parse(
-        fs.readFileSync(path.join(f.input.projectRoot, 'observed.json'), 'utf8')
-    );
-    assert.deepEqual(observed.args, f.input.args);
-    assert.equal(observed.cliEntry, f.runtime.cliEntry);
-    assert.equal(observed.cwd, f.input.projectRoot);
-    assert.equal(observed.env.NODE_OPTIONS, undefined);
-    assert.equal(observed.env.NO_COLOR, '1');
-    assert.deepEqual(process.argv, parentArgv);
-    assert.equal(process.cwd(), parentCwd);
-    assert.deepEqual({ ...process.env }, parentEnv);
-});
-
-test('native choices reject invalid selections and non-deploy or legacy launches before spawn', async () => {
-    for (const nativeChoices of [
-        null,
-        {},
-        { fixShared: '' },
-        { fixShared: '  ' },
-        { fixShared: true },
-        { fixShared: 'x\0y' },
-        { fixShared: 'folder', other: true },
-    ]) {
-        const f = fixture(['deploy']);
-        f.input.nativeChoices = nativeChoices;
-        const result = await runNativeProcess(
-            f.input,
-            { signal: f.controller.signal, nativeCommandMode: true },
-            f.runtime
-        );
-        safe(result);
-        assert.equal(result.outcome, 'invalid-input');
-        assert.equal(result.started, false);
-    }
-    for (const [args, nativeCommandMode] of [
-        [['deploy'], false],
-        [['retrieve'], true],
-        [[], true],
-    ]) {
-        const f = fixture(args);
-        f.input.nativeChoices = { fixShared: 'folder' };
-        assert.equal(
-            (
-                await runNativeProcess(
-                    f.input,
-                    { signal: f.controller.signal, nativeCommandMode },
-                    f.runtime
-                )
-            ).outcome,
-            'invalid-input'
-        );
-        assert.equal(fs.existsSync(path.join(f.input.projectRoot, 'observed.json')), false);
-    }
-});
-
-test('native bridge retains package validation and prelaunch cancellation evidence', async () => {
-    const f = fixture(['deploy']);
-    f.input.nativeChoices = { fixShared: 'folder' };
-    f.controller.abort();
-    const lifetime = { signal: f.controller.signal, nativeCommandMode: true };
-    const result = await runNativeProcess(f.input, lifetime, f.runtime);
-    safe(result);
-    assert.equal(result.outcome, 'cancelled');
-    assert.equal(result.started, false);
-    fs.unlinkSync(path.join(path.dirname(f.runtime.cliEntry), 'index.js'));
-    assert.equal((await runNativeProcess(f.input, lifetime, f.runtime)).outcome, 'invalid-input');
-});
-
 test('transport rejects invalid args, lifetime, cwd and CLI identity before launch', async () => {
     for (const args of [null, 'command', [42]]) {
         const f = fixture();
@@ -225,7 +138,7 @@ test('transport preserves prelaunch cancellation and invalid-input precedence', 
 });
 
 test('general transport drains finite flood without retaining output or imposing the legacy cap', async () => {
-    const f = fixture(['finite-flood'], '10.12.3');
+    const f = fixture(['finite-flood']);
     const captured = { stdout: 0, stderr: 0 };
     const progress = [];
     const result = await runNativeProcess(
@@ -255,10 +168,10 @@ test('general transport drains finite flood without retaining output or imposing
         stdoutBytes: captured.stdout,
         stderrBytes: captured.stderr,
     });
-    assert.equal((await run(f)).outcome, 'invalid-input');
+    assert.equal((await run(f)).outcome, 'termination-unconfirmed');
 });
 
-test('general transport accepts the 24h bound and rejects other major or malformed versions', async () => {
+test('general transport accepts the 24h bound and rejects every unreviewed runtime before spawn', async () => {
     const f = fixture(['long']);
     const chunks = [];
     const result = await runNativeProcess(
@@ -277,7 +190,15 @@ test('general transport accepts the 24h bound and rejects other major or malform
         ['stdout', 'started'],
         ['stderr', 'finished'],
     ]);
-    for (const version of ['11.0.0', '9.99.0', '10.01.0', '10.2.0-beta.1']) {
+    for (const version of [
+        '10.1.0',
+        '10.1.2',
+        '10.12.3',
+        '11.0.0',
+        '9.99.0',
+        '10.01.0',
+        '10.2.0-beta.1',
+    ]) {
         const invalid = fixture([], version);
         assert.equal(
             (
@@ -292,6 +213,7 @@ test('general transport accepts the 24h bound and rejects other major or malform
             ).outcome,
             'invalid-input'
         );
+        assert.equal(fs.existsSync(path.join(invalid.input.projectRoot, 'observed.json')), false);
     }
     for (const timeoutMs of [0, -1, 24 * 60 * 60 * 1000 + 1, Number.NaN]) {
         assert.equal(

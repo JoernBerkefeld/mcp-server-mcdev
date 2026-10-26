@@ -111,6 +111,26 @@ test('bonus and wildcard admission preserve installed native CLI dispatch withou
             ['--fixShared=ChildA,ChildB', 'cred/bu', 'dataExtension'],
             ['cred/bu', ['dataExtension'], null],
         ],
+        [
+            'deploy',
+            ['--fixShared', 'ChildA,ChildB', 'cred/bu', 'dataExtension'],
+            ['cred/bu', ['dataExtension'], null],
+        ],
+        [
+            'deploy',
+            ['--fixShared=*', 'cred/bu', 'dataExtension'],
+            ['cred/bu', ['dataExtension'], null],
+        ],
+        [
+            'deploy',
+            ['--fixShared', '*', 'cred/bu', 'dataExtension'],
+            ['cred/bu', ['dataExtension'], null],
+        ],
+        [
+            'deploy',
+            ['--no-fixShared', 'cred/bu', 'dataExtension'],
+            ['cred/bu', ['dataExtension'], null],
+        ],
         ['explainTypes', ['--json'], []],
         ['badKeys', ['cred/bu'], ['cred/bu']],
         ['document', ['cred/bu', 'dataExtension'], ['cred/bu', 'dataExtension']],
@@ -136,16 +156,15 @@ test('bonus and wildcard admission preserve installed native CLI dispatch withou
                 }
             }
             const { Util } = await import(new URL('util/util.js', ${JSON.stringify(nativeRoot.href)}));
-            if (${JSON.stringify(admitted.nativeChoices ?? null)}) Mcdev.setOptions({ ...${JSON.stringify(admitted.nativeChoices ?? {})}, skipInteraction: true });
             const setOptions = Mcdev.setOptions.bind(Mcdev);
             Mcdev.setOptions = (argv) => {
                 setOptions(argv);
                 if (${JSON.stringify(admitted.nativeChoices ?? null)}) {
-                    if (Util.OPTIONS.fixShared !== ${JSON.stringify(admitted.nativeChoices?.fixShared)} || Util.skipInteraction !== true) throw Error('Native seed overwritten');
+                    if (Util.OPTIONS.fixShared !== ${JSON.stringify(admitted.nativeChoices?.fixShared)} || !Util.skipInteraction) throw Error('Native choice not parsed noninteractively');
                 }
             };
             Mcdev[${JSON.stringify(command)}] = (...args) => fs.writeFileSync(${JSON.stringify(output)}, JSON.stringify(args));
-            process.argv = [process.execPath, ${JSON.stringify(new URL('cli.js', nativeRoot).pathname)}, ...${JSON.stringify([command, ...admitted.nativeArgs])}];
+            process.argv = [process.execPath, ${JSON.stringify(new URL('cli.js', nativeRoot).pathname)}, ...${JSON.stringify([command, ...(admitted.nativeChoices ? ['--skipInteraction=true'] : []), ...admitted.nativeArgs])}];
             await import(${JSON.stringify(new URL('cli.js', nativeRoot).href)});
         `;
         const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
@@ -229,7 +248,10 @@ test('every installed native boolean and alias preserves prerequisites before BU
             if (declaration.type !== 'boolean') continue;
             for (const alias of [name, ...[declaration.alias ?? []].flat()]) {
                 const flag = `--${alias}`;
-                const args = [flag, ...base];
+                const args = [
+                    flag,
+                    ...base.filter((token) => name !== 'purge' || token !== '--no-purge'),
+                ];
                 let native;
                 yargs([command, ...args])
                     .exitProcess(false)
@@ -310,32 +332,32 @@ test('retrieve and deploy preserve native all-credential and per-credential wild
     assert.throws(() => normalizeNativeCommandRun(request('badKeys', ['*'])), /credential\/BU/);
 });
 
-test('deploy fixShared boolean choices match native parsing and block child-BU prompts', () => {
+test('deploy fixShared negative choices preserve argv and bare choices block child-BU prompts', () => {
     const mcdevRequire = createRequire(createRequire(import.meta.url).resolve('mcdev'));
     const yargsRequire = createRequire(mcdevRequire.resolve('yargs'));
     const yargs = yargsRequire('yargs');
     for (const [choice, expected] of [
-        ['--fixShared', true],
-        ['--fixShared=true', true],
+        ['--fixShared', 'cred/bu'],
+        ['--fixShared=true', 'true'],
         ['--no-fixShared', false],
-        ['--fixShared=false', false],
+        ['--fixShared=false', 'false'],
     ]) {
         const args = [choice, 'cred/bu', '-m', 'dataExtension'];
         const parsed = yargs(args)
             .exitProcess(false)
             .help(false)
             .version(false)
-            .option('fixShared', { type: 'boolean' })
+            .option('fixShared', { type: 'string', coerce: (value) => value === '' || value })
             .parseSync();
         assert.equal(parsed.fixShared, expected);
-        assert.equal(parsed._[0], 'cred/bu');
-        if (expected) {
+        if (choice !== '--fixShared') assert.equal(parsed._[0], 'cred/bu');
+        if (expected === false) {
+            assert.deepEqual(normalizeNativeCommandRun(request('deploy', args)).args, args);
+        } else {
             assert.throws(
                 () => normalizeNativeCommandRun(request('deploy', args)),
                 /child-BU selection/
             );
-        } else {
-            assert.deepEqual(normalizeNativeCommandRun(request('deploy', args)).args, args);
         }
     }
     assert.throws(
@@ -347,16 +369,17 @@ test('deploy fixShared boolean choices match native parsing and block child-BU p
     );
 });
 
-test('explicit shared-child choices bridge only their own tokens and preserve original argv', () => {
+test('explicit shared-child choices preserve every native CLI token', () => {
     for (const choice of [
         ['--fixShared=ChildA,ChildB'],
         ['--fixShared', 'ChildA,ChildB'],
         ['--fixShared=*'],
+        ['--fixShared', '*'],
     ]) {
         const args = [...choice, 'cred/bu', 'dataExtension', '007', '--future=value'];
         const run = normalizeNativeCommandRun(request('deploy', args));
         assert.deepEqual(run.args, args);
-        assert.deepEqual(run.nativeArgs, args.slice(choice.length));
+        assert.deepEqual(run.nativeArgs, args);
         assert.equal(
             run.nativeChoices.fixShared,
             choice.length === 2 ? choice[1] : choice[0].split('=')[1]
@@ -374,6 +397,7 @@ test('explicit shared-child choices bridge only their own tokens and preserve or
         ['--fixShared'],
         ['--fixShared='],
         ['--fixShared=true'],
+        ['--fixShared=false'],
         ['--fixShared', 'true'],
         ['--fixShared=ChildA,,ChildB'],
         ['--fixShared=ChildA,'],
@@ -450,7 +474,7 @@ test('argv is frozen and copied, never split, trimmed, escaped or metadata-restr
     assert.equal(result.args[0], 'cred/*');
 });
 
-test('native yargs oracle confirms multi-character aliases and purge boolean semantics', () => {
+test('native yargs oracle confirms multi-character aliases and declared purge boolean semantics', () => {
     const mcdevRequire = createRequire(createRequire(import.meta.url).resolve('mcdev'));
     const yargsRequire = createRequire(mcdevRequire.resolve('yargs'));
     const yargs = yargsRequire('yargs');
@@ -462,12 +486,12 @@ test('native yargs oracle confirms multi-character aliases and purge boolean sem
             .option('metadata', { type: 'string', array: true, alias: 'm' })
             .option('buFrom', { type: 'string', alias: 'bf' })
             .option('buTo', { type: 'string', alias: 'bt' })
-            .option('purge', {})
+            .option('purge', { type: 'boolean' })
             .parseSync();
     assert.equal(parse([...compound, '--no-purge']).buFrom, 'cred/source');
     assert.equal(parse([...compound, '--purge']).purge, true);
     assert.equal(parse([...compound, '--no-purge']).purge, false);
-    assert.equal(parse([...compound, '--purge=true']).purge, 'true');
+    assert.equal(parse([...compound, '--purge=true']).purge, true);
     assert.equal(parse(['-bf', 'cred/source']).buFrom, undefined);
 });
 
@@ -500,13 +524,13 @@ test('compound prerequisites require every native mandatory option and boolean p
         ['build', build],
         ['clone', compound],
     ]) {
-        for (const suffix of [[], ['--purge=true'], ['--purge=false'], ['--purge', 'true']]) {
+        for (const suffix of [[]]) {
             assert.throws(
                 () => normalizeNativeCommandRun(request(command, [...args, ...suffix])),
                 /boolean purge choice/
             );
         }
-        for (const choice of ['--purge', '--no-purge']) {
+        for (const choice of ['--purge', '--no-purge', '--purge=true', '--purge=false']) {
             assert.doesNotThrow(() =>
                 normalizeNativeCommandRun(request(command, [...args, choice]))
             );

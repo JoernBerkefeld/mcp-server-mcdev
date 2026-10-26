@@ -280,6 +280,24 @@ for (const command of methods) {
     });
 }
 
+test('installed 10.1.1 parser preserves joined, separate, wildcard and negative shared choices', () => {
+    for (const [choice, expectedChoice] of [
+        [['--fixShared=ChildA,ChildB'], 'ChildA,ChildB'],
+        [['--fixShared', 'ChildA,ChildB'], 'ChildA,ChildB'],
+        [['--fixShared=*'], '*'],
+        [['--fixShared', '*'], '*'],
+        [['--no-fixShared'], false],
+        [['--fixShared=false'], 'false'],
+    ]) {
+        dispatch(
+            ['deploy', '--skipInteraction=true', ...choice, bu, 'dataExtension', 'key'],
+            'deploy',
+            [bu, ['dataExtension'], ['key']],
+            { fixShared: expectedChoice, skipInteraction: 'true' }
+        );
+    }
+});
+
 for (const [alias, command] of [
     ['r', 'retrieve'],
     ['d', 'deploy'],
@@ -389,7 +407,7 @@ test('native repeated scalars, dotted interaction flags and typed/untyped false 
         ],
         'build',
         expected('build', false),
-        { skipValidation: 'false', fix: 'false', purge: 'false', bulk: false }
+        { skipValidation: 'false', fix: 'false', purge: false, bulk: false }
     );
 });
 

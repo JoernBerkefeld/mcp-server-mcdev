@@ -14,8 +14,6 @@ type StopReason = 'cancelled' | 'timed-out' | 'output-limit';
 export interface NativeProcessInput {
     readonly projectRoot: string;
     readonly args: readonly string[];
-    /** Internal API-only selections omitted from the CLI argv by the command contract. */
-    readonly nativeChoices?: { readonly fixShared: string };
 }
 export interface NativeProcessProgress {
     readonly stdoutBytes: number;
@@ -119,7 +117,6 @@ export async function runNativeProcess(
         });
     let cliEntry: string;
     let env: NodeJS.ProcessEnv;
-    let bridgeEntry: string | undefined;
     const generalMode = lifetime?.nativeCommandMode === true;
     const timeoutMs = lifetime?.timeoutMs ?? (generalMode ? 30 * 60 * 1000 : 30_000);
     try {
@@ -136,21 +133,6 @@ export async function runNativeProcess(
             throw new Error('Invalid lifetime');
         if (!Array.isArray(input.args) || input.args.some((arg) => typeof arg !== 'string'))
             throw new Error('Invalid arguments');
-        if (input.nativeChoices !== undefined) {
-            if (
-                !generalMode ||
-                input.args[0] !== 'deploy' ||
-                input.nativeChoices === null ||
-                typeof input.nativeChoices !== 'object' ||
-                Object.keys(input.nativeChoices).length !== 1 ||
-                typeof input.nativeChoices.fixShared !== 'string' ||
-                input.nativeChoices.fixShared.trim().length === 0 ||
-                input.nativeChoices.fixShared.includes('\0')
-            )
-                throw new Error('Invalid native choices');
-            bridgeEntry = fileURLToPath(new URL('native-cli-bridge.js', import.meta.url));
-            canonical(bridgeEntry, false);
-        }
         canonical(input.projectRoot, true);
         canonical(process.execPath, false);
         cliEntry =
@@ -165,22 +147,16 @@ export async function runNativeProcess(
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         if (
             manifest.name !== 'mcdev' ||
-            !(generalMode
-                ? typeof manifest.version === 'string' &&
-                  /^10\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(manifest.version)
-                : manifest.version === '10.1.0') ||
+            manifest.version !== '10.1.1' ||
             manifest.bin?.mcdev !== 'lib/cli.js'
         )
             throw new Error('Unsupported CLI');
-        if (bridgeEntry) canonical(path.join(path.dirname(cliEntry), 'index.js'), false);
         env = createNativeEnvironment();
     } catch {
         return result('invalid-input');
     }
     if (lifetime.signal.aborted) return result('cancelled', 'cancelled');
-    const argv = bridgeEntry
-        ? [bridgeEntry, cliEntry, input.nativeChoices!.fixShared, ...input.args]
-        : [cliEntry, ...input.args];
+    const argv = [cliEntry, ...input.args];
     return new Promise((resolve) => {
         let child: ReturnType<typeof spawn>;
         try {

@@ -12,7 +12,7 @@ test('static effects cover retrieve/deploy only and expose immutable evidence an
         ['retrieve', 'deploy']
     );
     for (const entry of RETRIEVE_DEPLOY_EFFECTS) {
-        assert.equal(entry.reviewedVersion, '10.1.0');
+        assert.equal(entry.reviewedVersion, '10.1.1');
         assert.equal(entry.status, 'guidance-only');
         assert.ok(Object.isFrozen(entry));
         for (const reference of entry.sourceReferences) {
@@ -58,10 +58,7 @@ test('native evidence anchors cleanup, hooks, interactive exceptions and rule se
     assert.match(read('metadataTypes/Automation.js'), /if \(Util\.OPTIONS\.schedule\)/);
     assert.match(read('metadataTypes/Automation.js'), /if \(Util\.OPTIONS\.execute\)/);
     assert.match(read('metadataTypes/Asset.js'), /if \(Util\.OPTIONS\.refresh\)/);
-    assert.match(
-        read('metadataTypes/DataExtension.js'),
-        /Util\.skipInteraction && fixBuPreselected\.length/
-    );
+    assert.match(read('metadataTypes/DataExtension.js'), /if \(!fixBuPreselected\.length\)/);
     assert.match(read('cli.js'), /choices: \['log', 'cli'\]/);
     assert.match(RETRIEVE_DEPLOY_EFFECTS[1].interaction, /still prompt/);
 });

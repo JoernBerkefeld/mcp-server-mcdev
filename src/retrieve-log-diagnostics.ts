@@ -41,7 +41,7 @@ const utcIso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const normalFilename = /^\d{4}-\d{2}-\d{2}T\d{2}\.\d{2}\.\d{2}\.\d{3}Z\.log$/;
 const record = /^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3} (debug|info|warn|error): (.*)$/;
 const invocation =
-    /^:: mcdev 10\.1\.0 :: ⚡ mcdev retrieve ([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})\/([A-Za-z0-9_][A-Za-z0-9_.-]{0,127}) (query|script) ([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})$/;
+    /^:: mcdev 10\.1\.[01] :: ⚡ mcdev retrieve ([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})\/([A-Za-z0-9_][A-Za-z0-9_.-]{0,127}) (query|script) ([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})$/;
 
 /**
  * Accept only canonical, real UTC timestamps (not Date's normalized invalid dates).
@@ -238,7 +238,7 @@ function canonical(candidate: string, directory: boolean): fs.Stats {
 }
 
 /**
- * Inspect only historical normal logs in mcdev 10.1.0's fixed project/logs root.
+ * Inspect only historical normal logs in mcdev 10.1.0/10.1.1's fixed project/logs root.
  * Requires caller quiescence: metadata checks detect drift, not a filesystem lock.
  * Missing historical evidence never initiates retrieval, native execution or retries.
  * @param input Exact configured aliases, literal key and inclusive canonical UTC window.

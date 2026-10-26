@@ -136,7 +136,7 @@ function checkNoninteractive(command: NativeCommand, args: readonly string[]): v
             // Scalar options must retain native string values, including numeric ones.
             ...(command === 'retrieve' ? ['like'] : []),
             ...(command === 'deploy'
-                ? ['keySuffix', 'ks', 'changeKeyField', 'ckf', 'changeKeyValue', 'ckv']
+                ? ['keySuffix', 'ks', 'changeKeyField', 'ckf', 'changeKeyValue', 'ckv', 'fixShared']
                 : []),
         ],
         array: [
@@ -159,7 +159,6 @@ function checkNoninteractive(command: NativeCommand, args: readonly string[]): v
                 : []),
             ...(command === 'deploy'
                 ? [
-                      'fixShared',
                       'autoMidSuffix',
                       'fromRetrieve',
                       'fr',
@@ -188,13 +187,13 @@ function checkNoninteractive(command: NativeCommand, args: readonly string[]): v
             ...(['build', 'clone', 'buildTemplate'].includes(command)
                 ? ['dependencies', 'D', 'retrieve', 'r']
                 : []),
+            ...(['build', 'clone'].includes(command) ? ['purge'] : []),
             ...(['build', 'buildTemplate'].includes(command) ? ['shareAsset'] : []),
             ...(command === 'clone' ? ['skipValidation', 'sv'] : []),
             ...(['buildDefinition', 'buildDefinitionBulk'].includes(command)
                 ? ['skipValidation', 'sv', 'purge', 'fix']
                 : []),
-            // build/clone purge and build skipValidation/fix are deliberately untyped
-            // in the installed CLI: do not coerce their string values to booleans.
+            // Build skipValidation/fix are deliberately untyped in the installed CLI.
         ],
         key: Object.fromEntries(
             ['metadata', 'buFrom', 'buTo', 'marketFrom', 'marketTo', 'market'].map((key) => [
@@ -212,11 +211,6 @@ function checkNoninteractive(command: NativeCommand, args: readonly string[]): v
         // Native yargs gives every declared positional type:string, even numeric names.
         configuration: { 'parse-positional-numbers': false },
     });
-    if (command === 'deploy' && parsed.fixShared) {
-        throw new Error(
-            'deploy --fixShared requires interactive child-BU selection. Omit it or use --no-fixShared; explicit child-BU choices require --fixShared=ChildA,ChildB.'
-        );
-    }
     if (command === 'explainTypes') return;
     if (command === 'build' || command === 'clone') {
         requireValue(parsed.metadata, 'metadata option');
@@ -260,10 +254,10 @@ function invalidSharedChoice(): never {
 }
 
 /**
- * Split the explicit shared-child choice from native CLI tokens, without rewriting other tokens.
+ * Inspect explicit shared-child choices while preserving every native CLI token.
  * @param command - Canonical native command.
  * @param args - Original native tokens.
- * @returns {object} Native tokens and, when explicitly supplied, the API-only shared-child choice.
+ * @returns {object} Unchanged native tokens and the selection used for prelaunch validation.
  */
 function extractSharedChoice(
     command: NativeCommand,
@@ -283,7 +277,7 @@ function extractSharedChoice(
     const index = occurrences[0];
     const token = args[index];
     if (occurrences.length !== 1) invalidSharedChoice();
-    if (token === '--no-fixShared' || token === '--fixShared=false') {
+    if (token === '--no-fixShared') {
         return { nativeArgs: Object.freeze(nativeArgs) };
     }
     const separate = token === '--fixShared';
@@ -302,8 +296,8 @@ function extractSharedChoice(
             .some((name) => !name.trim() || (name.trim() === '*' && selection !== '*'))
     )
         invalidSharedChoice();
-    // A choice itself explicitly opts into noninteractive sharing. Do not let a
-    // later CLI option overwrite the bridge's seeded skipInteraction=true.
+    // Explicit choices require noninteractive dispatch; conflicting negative flags
+    // must not silently re-enable the native child-selection prompt.
     const interaction = parse(tokens, { alias: { skipInteraction: ['yes', 'y'] } });
     const choices = [interaction.skipInteraction].flat();
     if (
@@ -318,7 +312,6 @@ function extractSharedChoice(
             'Explicit shared-child selection conflicts with disabling skipInteraction/yes'
         );
     }
-    nativeArgs.splice(index, separate ? 2 : 1);
     return {
         nativeArgs: Object.freeze(nativeArgs),
         nativeChoices: Object.freeze({ fixShared: selection as string }),
