@@ -130,6 +130,29 @@ Register **`mcp-server-mcdev`** with the same patterns as other stdio MCP server
 }
 ```
 
+### Claude Code
+
+Project-scoped — add to `.mcp.json` at your repo root:
+
+```json
+{
+  "mcpServers": {
+    "mcdev": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-mcdev@latest"]
+    }
+  }
+}
+```
+
+Or user-scoped (available in every project), via the CLI:
+
+```bash
+claude mcp add --transport stdio --scope user mcdev -- npx -y mcp-server-mcdev@latest
+```
+
+Run `claude` and approve the server when prompted; the tools are then available in any session.
+
 ### Claude Desktop
 
 `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) — use the same `mcpServers` object shape as Cursor.
