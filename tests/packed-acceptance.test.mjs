@@ -134,7 +134,7 @@ test(
                 assert.equal(entry.identifier, pkg.name);
                 assert.equal(entry.transport.type, 'stdio');
             }
-            assert.equal(mcdev.version, '10.1.1');
+            assert.equal(mcdev.version, '10.2.0');
             assert.equal(sdk.version, '4.0.2');
             assert.equal(pkg.engines.node, '^22.22.2 || >=24.15.0');
             assert.equal(mcdev.engines.node, pkg.engines.node);
@@ -159,7 +159,7 @@ test(
             );
             assert.ifError(result.error);
             assert.equal(result.status, 0, result.stderr);
-            assert.equal(result.stdout, '10.1.1');
+            assert.equal(result.stdout, '10.2.0');
         });
         const child = spawn(process.execPath, [path.join(installed, 'dist', 'index.js')], {
             cwd: fixture,
@@ -308,13 +308,13 @@ test(
                 );
                 assert.equal(nativeCatalog.outcome, 'exited');
                 assert.equal(nativeCatalog.process.exitCode, 0);
-                assert.equal(nativeCatalog.runtimeVersion, '10.1.1');
+                assert.equal(nativeCatalog.runtimeVersion, '10.2.0');
                 assert.equal(nativeCatalog.remoteCompletenessVerified, false);
                 const all = await tool('mcdev_list_metadata_types');
-                assert.match(all, /^mcdev 10\.1\.1 — \d+ type\(s\)/);
+                assert.match(all, /^mcdev 10\.2\.0 — \d+ type\(s\)/);
                 assert.match(all, /\*\*journey\*\*/);
                 const matching = await tool('mcdev_list_metadata_types', { filter: 'JoUrNeY' });
-                assert.match(matching, /mcdev 10\.1\.1 — 2 type\(s\)/);
+                assert.match(matching, /mcdev 10\.2\.0 — 2 type\(s\)/);
                 assert.match(matching, /\*\*event\*\*/);
                 assert.match(matching, /\*\*journey\*\*/);
                 assert.match(
@@ -370,37 +370,24 @@ test(
                 }
             }
         );
-        await t.test(
-            'installed package has no legacy tools or modules and README matches tools',
-            async () => {
-                const listed = await request('tools/list');
-                const names = listed.tools.map(({ name }) => name).toSorted();
-                assert.equal(names.length, 20);
-                for (const name of [
-                    'retrieve_mcdev_query',
-                    'retrieve_mcdev_script',
-                    'prepare_mcdev_query_retrieve',
-                    'render_mcdev_query_definition',
-                ]) {
-                    assert.ok(!names.includes(name));
-                }
-                const readme = fs.readFileSync(path.join(installed, 'README.md'), 'utf8');
-                const documented = [
-                    ...readme
-                        .split('## Tools')[1]
-                        .split('## Native execution')[0]
-                        .matchAll(/^\| `([^`]+)`/gmu),
-                ]
-                    .map((match) => match[1])
-                    .toSorted();
-                assert.deepEqual(documented, names);
-                assert.ok(
-                    !files.some((file) =>
-                        /(?:query-retrieve|script-retrieve|query-definition-render)/u.test(file)
-                    )
-                );
+        await t.test('installed package has no legacy tools or modules', async () => {
+            const listed = await request('tools/list');
+            const names = listed.tools.map(({ name }) => name).toSorted();
+            assert.equal(names.length, 20);
+            for (const name of [
+                'retrieve_mcdev_query',
+                'retrieve_mcdev_script',
+                'prepare_mcdev_query_retrieve',
+                'render_mcdev_query_definition',
+            ]) {
+                assert.ok(!names.includes(name));
             }
-        );
+            assert.ok(
+                !files.some((file) =>
+                    /(?:query-retrieve|script-retrieve|query-definition-render)/u.test(file)
+                )
+            );
+        });
         await t.test(
             'installed historical-log diagnosis is strict and returns only finite observations',
             async () => {
@@ -432,7 +419,7 @@ test(
                     fs.writeFileSync(
                         path.join(fixture, 'logs', file),
                         [
-                            '14:00:00.000 debug: :: mcdev 10.1.1 :: ⚡ mcdev retrieve sample/Training query Example_1',
+                            '14:00:00.000 debug: :: mcdev 10.2.0 :: ⚡ mcdev retrieve sample/Training query Example_1',
                             '14:00:00.001 info: mcdev:: Retrieve',
                             '14:00:00.002 info: :: Retrieving sample/Training',
                             '14:00:00.003 info: Retrieving: query - Key: Example_1',

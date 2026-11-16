@@ -12,7 +12,7 @@ test('static effects cover retrieve/deploy only and expose immutable evidence an
         ['retrieve', 'deploy']
     );
     for (const entry of RETRIEVE_DEPLOY_EFFECTS) {
-        assert.equal(entry.reviewedVersion, '10.1.1');
+        assert.equal(entry.reviewedVersion, '10.2.0');
         assert.equal(entry.status, 'guidance-only');
         assert.ok(Object.isFrozen(entry));
         for (const reference of entry.sourceReferences) {

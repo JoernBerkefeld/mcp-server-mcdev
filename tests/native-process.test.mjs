@@ -13,7 +13,7 @@ const runRoot = fs.realpathSync.native(
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain synthetic run-owned fixtures; no recursive cleanup or native mcdev invocation.
-function fixture(args = ['synthetic-command', 'literal ; & value'], version = '10.1.1') {
+function fixture(args = ['synthetic-command', 'literal ; & value'], version = '10.2.0') {
     const projectRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(runRoot, 'project-')));
     const packageRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(runRoot, 'runtime-')));
     fs.mkdirSync(path.join(packageRoot, 'lib'));

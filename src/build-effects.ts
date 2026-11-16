@@ -44,7 +44,7 @@ const sourceReferences = Object.freeze(
         ],
         [
             'mcdev/lib/metadataTypes/MetadataType.js',
-            2953,
+            2961,
             'static async validation(method, originalItem, targetDir) {',
         ],
         [
@@ -59,7 +59,7 @@ const sourceReferences = Object.freeze(
 
 const shared = {
     status: 'partial-source-review' as const,
-    reviewedVersion: '10.1.1' as const,
+    reviewedVersion: '10.2.0' as const,
     markets:
         'For standalone template/definition commands, positional MARKET wins over --market. Builder merges market objects in array order, with later values winning; first market __clone__ skips substitutions. CLI --metadata combos replace positional TYPE and KEY/FILENAME selection.',
     destinations:
@@ -131,7 +131,7 @@ const templateSourceReferences = Object.freeze([
             576,
             'static async replaceCbReferenceLoop(metadataMap, retrieveDir, findAssetKeys) {',
         ],
-        ['mcdev/lib/metadataTypes/MetadataType.js', 2659, 'static async getDependentFiles('],
+        ['mcdev/lib/metadataTypes/MetadataType.js', 2667, 'static async getDependentFiles('],
         [
             'mcdev/lib/metadataTypes/Asset.js',
             371,

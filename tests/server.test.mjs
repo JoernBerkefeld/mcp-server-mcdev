@@ -93,11 +93,11 @@ describe('release runtime contract', () => {
         }
     });
 
-    test('uses registry mcdev 10.1.1 and its SDK 4.0.2', () => {
-        assert.equal(pkg.dependencies.mcdev, '^10.1.1');
-        assert.equal(lock.packages[''].dependencies.mcdev, '^10.1.1');
-        assert.equal(lock.packages['node_modules/mcdev'].version, '10.1.1');
-        assert.equal(getBundledMcdevVersion(), '10.1.1');
+    test('uses registry mcdev 10.2.0 and its SDK 4.0.2', () => {
+        assert.equal(pkg.dependencies.mcdev, '^10.2.0');
+        assert.equal(lock.packages[''].dependencies.mcdev, '^10.2.0');
+        assert.equal(lock.packages['node_modules/mcdev'].version, '10.2.0');
+        assert.equal(getBundledMcdevVersion(), '10.2.0');
         const require = createRequire(import.meta.url);
         const mcdevRequire = createRequire(require.resolve('mcdev'));
         const sdkPackage = JSON.parse(

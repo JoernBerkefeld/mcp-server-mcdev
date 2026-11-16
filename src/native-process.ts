@@ -147,7 +147,7 @@ export async function runNativeProcess(
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         if (
             manifest.name !== 'mcdev' ||
-            manifest.version !== '10.1.1' ||
+            manifest.version !== '10.2.0' ||
             manifest.bin?.mcdev !== 'lib/cli.js'
         )
             throw new Error('Unsupported CLI');
