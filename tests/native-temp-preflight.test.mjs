@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { expectedTempRoot } from './expected-temp-root.mjs';
 
 // Keep the development machine's Windows policy without imposing it on CI hosts.
 export function preflight(
@@ -23,14 +24,17 @@ export function preflight(
         assert.notEqual(normalized, paths.parse(normalized).root, `${name} must not be a root`);
         if (platform === 'win32') {
             assert.match(value, /^[a-z]:[\\/]/iu, `${name} must be drive-absolute`);
-            assert.equal(
-                paths
-                    .resolve(value)
-                    .replace(/[\\/]+$/u, '')
-                    .toLowerCase(),
-                String.raw`f:\temp`,
-                name
-            );
+            const expected = expectedTempRoot(source, platform);
+            if (expected) {
+                assert.equal(
+                    paths
+                        .resolve(value)
+                        .replace(/[\\/]+$/u, '')
+                        .toLowerCase(),
+                    expected,
+                    name
+                );
+            }
         }
     }
 }
