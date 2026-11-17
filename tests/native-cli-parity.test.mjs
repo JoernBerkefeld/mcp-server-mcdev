@@ -11,7 +11,9 @@ import { preflight } from './native-temp-preflight.test.mjs';
 
 // This machine's temp policy is checked independently of production code under test.
 preflight();
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-native-cli-parity-'));
+const root = fs.realpathSync.native(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-native-cli-parity-'))
+);
 fs.writeFileSync(path.join(root, '.owner'), randomUUID());
 const nativeRoot = new URL('../node_modules/mcdev/lib/', import.meta.url);
 const runner = path.join(root, 'runner.mjs');
@@ -56,7 +58,9 @@ await import(${JSON.stringify(new URL('cli.js', nativeRoot).href)});
 
 function run(args) {
     preflight();
-    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-native-case-'));
+    const cwd = fs.realpathSync.native(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-native-case-'))
+    );
     fs.writeFileSync(path.join(cwd, '.owner'), randomUUID());
     const env = {};
     for (const name of [

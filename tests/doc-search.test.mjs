@@ -16,7 +16,9 @@ import {
 
 function fixture(markdown) {
     validateTempEnvironment();
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-doc-search-'));
+    const root = fs.realpathSync.native(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-doc-search-'))
+    );
     fs.writeFileSync(path.join(root, '.run-owner'), randomUUID());
     fs.writeFileSync(path.join(root, 'Guide.md'), markdown);
     // Retained intentionally: no recursive fixture cleanup.

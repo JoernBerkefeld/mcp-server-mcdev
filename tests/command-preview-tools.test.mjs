@@ -12,7 +12,7 @@ import { listCommands, lookupCommand } from '../dist/command-catalog.js';
 
 validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-command-tools-'))
+    fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-command-tools-')))
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain the run-owned fixture; never recursively delete it.

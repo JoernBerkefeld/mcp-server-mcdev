@@ -9,7 +9,7 @@ import { runNativeProcess } from '../dist/native-process.js';
 
 validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-native-process-'))
+    fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-native-process-')))
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain synthetic run-owned fixtures; no recursive cleanup or native mcdev invocation.

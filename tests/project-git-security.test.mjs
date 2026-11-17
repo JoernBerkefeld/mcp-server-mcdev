@@ -11,7 +11,7 @@ import { inspectProjectGitSecurity } from '../dist/project-git-security.js';
 
 validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-git-security-'))
+    fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-git-security-')))
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain synthetic fixtures. No auth contents or history and no recursive cleanup.

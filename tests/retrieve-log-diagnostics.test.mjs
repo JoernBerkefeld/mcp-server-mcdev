@@ -239,7 +239,7 @@ test('bounds, malformed text and noncanonical time windows are unsupported and n
 function project() {
     validateTempEnvironment();
     const workspaceRoot = fs.realpathSync.native(
-        fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-log-'))
+        fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-log-')))
     );
     fs.writeFileSync(
         path.join(workspaceRoot, '.mcdevrc.json'),

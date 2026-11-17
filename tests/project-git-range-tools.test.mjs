@@ -196,7 +196,9 @@ test(
                 'invalid roots and malformed config expose only a fixed safe error',
                 async () => {
                     const malformed = fs.realpathSync.native(
-                        fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-range-invalid-'))
+                        fs.realpathSync.native(
+                            fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-range-invalid-'))
+                        )
                     );
                     fs.writeFileSync(path.join(malformed, '.owner'), randomUUID());
                     fs.writeFileSync(

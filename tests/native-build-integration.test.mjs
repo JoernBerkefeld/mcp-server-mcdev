@@ -72,7 +72,7 @@ for (const order of [
         preflight();
         const started = new Date().toISOString();
         const root = fs.realpathSync.native(
-            fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-native-build-'))
+            fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-native-build-')))
         );
         const owner = randomUUID();
         fs.writeFileSync(path.join(root, '.owner'), owner);

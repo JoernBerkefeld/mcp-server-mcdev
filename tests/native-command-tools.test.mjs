@@ -38,7 +38,7 @@ test('stdio exposes native execution with host-controlled approval and actionabl
         });
         assert.equal(reconcile.isError, true);
         const root = fs.realpathSync.native(
-            fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-stdio-native-'))
+            fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-stdio-native-')))
         );
         fs.writeFileSync(path.join(root, '.owner'), randomUUID());
         fs.writeFileSync(path.join(root, '.mcdevrc.json'), '{}');

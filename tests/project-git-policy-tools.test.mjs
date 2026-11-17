@@ -13,7 +13,7 @@ import { inspectProjectGitPolicy } from '../dist/project-git-policy.js';
 
 validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-git-policy-tools-'))
+    fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-git-policy-tools-')))
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain synthetic fixtures and their ownership marker; never recursively delete them.
@@ -25,7 +25,9 @@ const sentinel = 'synthetic-private-policy-fragment';
  * @returns {string} The isolated project root.
  */
 function fixture(raw = '{}') {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-policy-project-'));
+    const root = fs.realpathSync.native(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-policy-project-'))
+    );
     fs.writeFileSync(path.join(root, '.owner'), randomUUID());
     if (raw !== undefined) fs.writeFileSync(path.join(root, '.mcdevrc.json'), raw);
     return root;
@@ -169,8 +171,8 @@ test(
                 }
             );
             await t.test('invalid roots and configs expose only a fixed safe error', async () => {
-                const missingConfig = fs.mkdtempSync(
-                    path.join(os.tmpdir(), 'mcdev-policy-missing-')
+                const missingConfig = fs.realpathSync.native(
+                    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-policy-missing-'))
                 );
                 fs.writeFileSync(path.join(missingConfig, '.owner'), randomUUID());
                 for (const workspaceRoot of [

@@ -53,7 +53,9 @@ test('asset result survives UTF8 byte chunks and documented logger colors', () =
 
 test('real native Asset.resolveId local success returns path without an error field', async (t) => {
     validateTempEnvironment();
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-resolved-asset-'));
+    const root = fs.realpathSync.native(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-resolved-asset-'))
+    );
     fs.writeFileSync(path.join(root, '.owner'), randomUUID());
     // Retain this run-owned fixture; no recursive cleanup.
     const require = createRequire(import.meta.url);

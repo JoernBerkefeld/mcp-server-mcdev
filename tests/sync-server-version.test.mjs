@@ -62,7 +62,7 @@ function git(cwd, ...args) {
  */
 function fixture(t, malformed = false) {
     validateTempEnvironment();
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-version-'));
+    const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-version-')));
     const cwd = path.join(root, 'repo');
     fs.mkdirSync(cwd);
     fs.writeFileSync(

@@ -12,7 +12,7 @@ import { diagnoseProjectConfig } from '../dist/project-config-diagnostics.js';
 
 validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-config-tools-'))
+    fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-config-tools-')))
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain synthetic fixtures with their ownership marker; never recursively delete them.

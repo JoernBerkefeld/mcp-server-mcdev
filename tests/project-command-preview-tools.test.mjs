@@ -12,7 +12,7 @@ import { previewProjectCommand } from '../dist/project-command-preview.js';
 
 validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-project-preview-tools-'))
+    fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-project-preview-tools-')))
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain the ownership-marked synthetic fixture; never recursively delete it.

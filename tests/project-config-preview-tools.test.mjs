@@ -12,7 +12,7 @@ import { previewProjectConfig } from '../dist/project-config-preview.js';
 
 validateTempEnvironment();
 const runRoot = fs.realpathSync.native(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-config-preview-tools-'))
+    fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-config-preview-tools-')))
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Keep owned synthetic fixtures; no recursive cleanup.

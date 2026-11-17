@@ -10,7 +10,9 @@ import { bundleWiki, readSourceProvenance } from '../scripts/bundle-wiki.mjs';
 
 function fixture() {
     validateTempEnvironment();
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-wiki-provenance-'));
+    const root = fs.realpathSync.native(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-wiki-provenance-'))
+    );
     fs.writeFileSync(path.join(root, '.run-owner'), randomUUID());
     const sourceDir = path.join(root, 'source');
     const outDir = path.join(root, 'bundled', 'wiki');

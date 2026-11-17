@@ -47,7 +47,9 @@ test(
     { timeout: 240_000 },
     async (t) => {
         validateTempEnvironment();
-        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-packed-acceptance-'));
+        const root = fs.realpathSync.native(
+            fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-packed-acceptance-'))
+        );
         const archive = path.join(root, 'archive');
         const fixture = path.join(root, 'consumer');
         const owner = randomUUID();

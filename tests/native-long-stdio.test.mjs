@@ -40,7 +40,7 @@ test(
     async (t) => {
         assert.equal(DEFAULT_REQUEST_TIMEOUT_MSEC, 60_000);
         const root = fs.realpathSync.native(
-            fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-long-stdio-'))
+            fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-long-stdio-')))
         );
         fs.writeFileSync(path.join(root, '.owner'), randomUUID());
         // Run-owned fixtures are retained with their ownership marker; no recursive cleanup.

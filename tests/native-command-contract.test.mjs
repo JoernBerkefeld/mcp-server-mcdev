@@ -97,7 +97,9 @@ test('supported command admission matches every catalog-advertised native runner
 
 test('bonus and wildcard admission preserve installed native CLI dispatch without account access', () => {
     preflight();
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-bonus-parity-'));
+    const root = fs.realpathSync.native(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'mcdev-bonus-parity-'))
+    );
     fs.writeFileSync(path.join(root, '.owner'), randomUUID());
     // Deliberately retain the run-owned fixture; no recursive cleanup.
     const nativeRoot = new URL('../node_modules/mcdev/lib/', import.meta.url);
