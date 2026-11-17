@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { expectedTempRoot } from './expected-temp-root.mjs';
 
 // This machine requires F:/Temp; other platforms use their actual OS temporary directory.
 function preflight() {
@@ -23,7 +24,8 @@ function preflight() {
             .replaceAll(/[\\/]+$/gu, '')
             .toLowerCase();
         assert.notEqual(path.resolve(value), path.parse(path.resolve(value)).root);
-        if (process.platform === 'win32') assert.equal(normalized, String.raw`f:\temp`, name);
+        const expected = expectedTempRoot();
+        if (expected) assert.equal(normalized, expected, name);
     }
 }
 

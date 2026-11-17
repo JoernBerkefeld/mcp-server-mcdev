@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { executeNativeCommand } from '../dist/native-command-execution.js';
 import { validateTempEnvironment } from '../dist/temp-environment.js';
+import { expectedTempRoot } from './expected-temp-root.mjs';
 
 function preflight() {
     validateTempEnvironment();
@@ -19,13 +20,13 @@ function preflight() {
         if (!value && name !== 'node' && (name !== 'TEMP' || process.platform !== 'win32'))
             continue;
         assert.ok(value && path.isAbsolute(value), name);
-        if (process.platform === 'win32')
+        if (expectedTempRoot())
             assert.equal(
                 path
                     .resolve(value)
                     .replaceAll(/[\\/]+$/gu, '')
                     .toLowerCase(),
-                String.raw`f:\temp`,
+                expectedTempRoot(),
                 name
             );
     }

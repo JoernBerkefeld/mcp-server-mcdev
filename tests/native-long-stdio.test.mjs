@@ -10,9 +10,10 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { DEFAULT_REQUEST_TIMEOUT_MSEC } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { validateTempEnvironment } from '../dist/temp-environment.js';
+import { expectedTempRoot } from './expected-temp-root.mjs';
 
 validateTempEnvironment();
-if (process.platform === 'win32') {
+if (expectedTempRoot()) {
     for (const [name, value] of Object.entries({
         TEMP: process.env.TEMP,
         TMP: process.env.TMP,
@@ -26,7 +27,7 @@ if (process.platform === 'win32') {
                     .resolve(value)
                     .replace(/[\\/]+$/u, '')
                     .toLowerCase(),
-                String.raw`f:\temp`
+                expectedTempRoot()
             );
         }
     }
