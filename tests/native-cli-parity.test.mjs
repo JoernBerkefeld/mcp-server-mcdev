@@ -284,7 +284,7 @@ for (const command of methods) {
     });
 }
 
-test('installed 10.2.0 parser preserves joined, separate, wildcard and negative shared choices', () => {
+test('installed 10.3.0 parser preserves joined, separate, wildcard and negative shared choices', () => {
     for (const [choice, expectedChoice] of [
         [['--fixShared=ChildA,ChildB'], 'ChildA,ChildB'],
         [['--fixShared', 'ChildA,ChildB'], 'ChildA,ChildB'],

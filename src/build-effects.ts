@@ -59,7 +59,7 @@ const sourceReferences = Object.freeze(
 
 const shared = {
     status: 'partial-source-review' as const,
-    reviewedVersion: '10.2.0' as const,
+    reviewedVersion: '10.3.0' as const,
     markets:
         'For standalone template/definition commands, positional MARKET wins over --market. Builder merges market objects in array order, with later values winning; first market __clone__ skips substitutions. CLI --metadata combos replace positional TYPE and KEY/FILENAME selection.',
     destinations:

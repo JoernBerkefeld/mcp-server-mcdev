@@ -60,7 +60,7 @@ test('catalog exactly covers installed command declarations, aliases, signatures
         REVIEWED_MCDEV_VERSION,
         'Review the newly installed mcdev version'
     );
-    assert.equal(REVIEWED_MCDEV_VERSION, '10.2.0');
+    assert.equal(REVIEWED_MCDEV_VERSION, '10.3.0');
     assert.deepEqual(
         listCommands().map((command) => ({
             name: command.name,

@@ -13,7 +13,7 @@ const runRoot = fs.realpathSync.native(
 );
 fs.writeFileSync(path.join(runRoot, '.owner'), randomUUID());
 // Retain synthetic run-owned fixtures; no recursive cleanup or native mcdev invocation.
-function fixture(args = ['synthetic-command', 'literal ; & value'], version = '10.2.0') {
+function fixture(args = ['synthetic-command', 'literal ; & value'], version = '10.3.0') {
     const projectRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(runRoot, 'project-')));
     const packageRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(runRoot, 'runtime-')));
     fs.mkdirSync(path.join(packageRoot, 'lib'));
@@ -197,7 +197,7 @@ test('general transport accepts the 24h bound and rejects every unreviewed runti
         '11.0.0',
         '9.99.0',
         '10.01.0',
-        '10.2.0-beta.1',
+        '10.3.0-beta.1',
     ]) {
         const invalid = fixture([], version);
         assert.equal(

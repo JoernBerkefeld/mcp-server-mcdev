@@ -1,24 +1,24 @@
 {
   "schemaVersion": 1,
   "source": {
-    "revision": "479305e471d10e829d6acb285f0d98079dfd94b7",
+    "revision": "bd838f79f78402a951de21167b2dfea2f6942344",
     "dirty": false,
     "localReviewStatus": "not-reviewed"
   },
-  "mcdevVersion": "10.2.0",
+  "mcdevVersion": "10.3.0",
   "pages": {
     "02.-Getting-Started.md": "8058957990bf5bf7cc8d97db717d2482ae27777549b7cc0758ae37dba9c65819",
-    "03.-Updating-mcdev.md": "2fe2a4e4c2dc053320a2e6ceb380c6b141cf849e9b8bcc82725f59dc30660cea",
+    "03.-Updating-mcdev.md": "ce38013d02d935607b616fdad263b356677ceb0f2b41275186d1a63fd04c7a32",
     "03.a-~-Migrating-to-v10.md": "cf3b5f44c4cfc9bfd8d771cdac6f85864b428ea0c30d8911c74cb5495e72bd83",
     "04.-Troubleshooting.md": "86f33fbef6255a73486f518ecb3bb8273c8149853b7fd1a65c0049a1ef359800",
-    "05.-Metadata-Type-Support.md": "8236a241f811f4950e07a50f49fadf6ea77cbbed340bbbd9bb1fb2bf6ec2410a",
+    "05.-Metadata-Type-Support.md": "056109385414d93ff74ac1a0fb11366fe76b9374c7b57b844cb811b9c239c4cb",
     "06.-Commands.md": "87f56aa147fec38bb74a99100d213de3e6d5f15c46d9df0d6f94d21bfc0adf90",
     "06.a-~-Admin-Commands.md": "8d757d8237e320b9dbd6a263e2bc4267baaaf5f283e41fb3412f498bd048e1f0",
     "06.b-~-Standard-Commands.md": "0a785f12c73b1e605f3371ab9586468594fba95f4107f255759a48522ae4ceb5",
     "06.c-~-Templating-Commands.md": "c4e981b79cbf7b537079e528f36ebf20564248b3d55291a1b46aaf22fdd4d01e",
     "06.d-~-Git-based-deployments-and-CICD.md": "aae9910a90c12d7dd3fb9b4b80ba89f426499e2a73e8cb95b2a3222ced89fdd4",
     "07.-Advanced-Configuration.md": "cdd35244c66828019b0883cd819895188ef1deac5118edbf7786a8b108842939",
-    "08.-Metadata-specific-settings-&-options.md": "9bbe3fc7f28c721c0cd79c2f936a8c3232864a4d153f1c18ed5b6a7bfd969f9a",
+    "08.-Metadata-specific-settings-&-options.md": "f62caea2114c1ab2c5a8bd5f064ab0931bffc78bc2e1ab07dc7cf716d8e67aa8",
     "09.-Examples.md": "68096022e325f0901de01bc81bbc6ec8a3988bfcaf0cf6909c988f9fe602f7f1",
     "10.-Contribute.md": "9636877140bb907b2d96e3156cf544ea8352d6c247c1026fbfde85cf25545264",
     "Home.md": "9dbe6ca30381125bc6d75485f85559d2ed53a8d6479deed55db7e8c94cc39689",
@@ -35,8 +35,8 @@
         "reconciledReleasedFixes": []
       },
       "03.-Updating-mcdev.md": {
-        "sourceSha256": "2fe2a4e4c2dc053320a2e6ceb380c6b141cf849e9b8bcc82725f59dc30660cea",
-        "bundledSha256": "c71e69cc2b59b333ca2e3c4f95e5e1fafb9e51d4926371d54b6c6c1f7d7aa4f8",
+        "sourceSha256": "ce38013d02d935607b616fdad263b356677ceb0f2b41275186d1a63fd04c7a32",
+        "bundledSha256": "4a2e3732c0d37efff9cad617503521389d45a857e4629049c35b88fef277aea2",
         "status": "pending-extension-and-local-guidance-retained",
         "reconciledReleasedFixes": []
       },
@@ -71,17 +71,17 @@
     }
   },
   "refreshReconciliation": {
-    "03.a-~-Migrating-to-v10.md": {
-      "oldSha256": "d0a6aa7cf0e3238847741fc9ae861e0e98df573b6f3c50ef8ede5153473c4867",
-      "proposedSha256": "cf3b5f44c4cfc9bfd8d771cdac6f85864b428ea0c30d8911c74cb5495e72bd83"
+    "03.-Updating-mcdev.md": {
+      "oldSha256": "2fe2a4e4c2dc053320a2e6ceb380c6b141cf849e9b8bcc82725f59dc30660cea",
+      "proposedSha256": "ce38013d02d935607b616fdad263b356677ceb0f2b41275186d1a63fd04c7a32"
     },
     "05.-Metadata-Type-Support.md": {
-      "oldSha256": "9e2e84a8ddab5ad700059d7e549906a0a75e35313012bc33dd0e2d2310ca59b8",
-      "proposedSha256": "8236a241f811f4950e07a50f49fadf6ea77cbbed340bbbd9bb1fb2bf6ec2410a"
+      "oldSha256": "8236a241f811f4950e07a50f49fadf6ea77cbbed340bbbd9bb1fb2bf6ec2410a",
+      "proposedSha256": "056109385414d93ff74ac1a0fb11366fe76b9374c7b57b844cb811b9c239c4cb"
     },
     "08.-Metadata-specific-settings-&-options.md": {
-      "oldSha256": "3e9e04fdf412fc5313009688c538cd280e7eec5dd5f74fc334b2914aec8c2198",
-      "proposedSha256": "9bbe3fc7f28c721c0cd79c2f936a8c3232864a4d153f1c18ed5b6a7bfd969f9a"
+      "oldSha256": "9bbe3fc7f28c721c0cd79c2f936a8c3232864a4d153f1c18ed5b6a7bfd969f9a",
+      "proposedSha256": "f62caea2114c1ab2c5a8bd5f064ab0931bffc78bc2e1ab07dc7cf716d8e67aa8"
     }
   }
 }

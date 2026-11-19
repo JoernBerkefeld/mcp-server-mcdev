@@ -1,7 +1,7 @@
 import { BUILD_EFFECTS } from './build-effects.js';
 
 /** Factual declaration inventory; never imports or executes the mcdev CLI. */
-export const REVIEWED_MCDEV_VERSION = '10.2.0' as const;
+export const REVIEWED_MCDEV_VERSION = '10.3.0' as const;
 export const COMMAND_CATALOG_SOURCE = 'mcdev/lib/cli.js' as const;
 
 /** Static host routing guidance, not executable tools or connected-server availability. */

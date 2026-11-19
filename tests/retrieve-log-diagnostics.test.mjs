@@ -34,7 +34,7 @@ const read = (file) =>
     fs.readFileSync(new URL(`../node_modules/mcdev/${file}`, import.meta.url), 'utf8');
 
 test('reviewed installed source anchors remain version-bound without native imports', () => {
-    assert.equal(JSON.parse(read('package.json')).version, '10.2.0');
+    assert.equal(JSON.parse(read('package.json')).version, '10.3.0');
     for (const [file, anchor] of [
         ['lib/util/util.js', "Util.logFileName = new Date().toISOString().replaceAll(':', '.');"],
         ['lib/util/util.js', '`${info.timestamp} ${info.level}: ${info.message}`'],
@@ -62,8 +62,8 @@ test('reviewed installed source anchors remain version-bound without native impo
         assert.ok(read(file).includes(anchor), file);
 });
 
-test('historical 10.1.0 and 10.1.1 and current 10.2.0 invocation headers remain supported', () => {
-    for (const version of ['10.1.0', '10.1.1', '10.2.0']) {
+test('historical 10.1.0, 10.1.1 and 10.2.0 and current 10.3.0 invocation headers remain supported', () => {
+    for (const version of ['10.1.0', '10.1.1', '10.2.0', '10.3.0']) {
         for (const metadataType of ['query', 'script']) {
             const lines = fixture(metadataType).map((line) => line.replace('10.1.0', version));
             assert.equal(classify(lines, { metadataType }).status, 'matched');
@@ -169,7 +169,7 @@ test('joined argv permits only the frozen literal positional spelling, never rec
         assert.equal(classify(lines).status, 'unsupported', command);
     }
     assert.equal(
-        classify(fixture().map((line) => line.replace('10.1.0', '10.3.0'))).status,
+        classify(fixture().map((line) => line.replace('10.1.0', '10.4.0'))).status,
         'unsupported'
     );
     for (const key of ['with space', 'a/b', '..', '*', '-option', 'a,b', 'a\nsecret']) {

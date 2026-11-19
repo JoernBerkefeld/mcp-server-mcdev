@@ -136,7 +136,7 @@ test(
                 assert.equal(entry.identifier, pkg.name);
                 assert.equal(entry.transport.type, 'stdio');
             }
-            assert.equal(mcdev.version, '10.2.0');
+            assert.equal(mcdev.version, '10.3.0');
             assert.equal(sdk.version, '4.0.2');
             assert.equal(pkg.engines.node, '^22.22.2 || >=24.15.0');
             assert.equal(mcdev.engines.node, pkg.engines.node);
@@ -161,7 +161,7 @@ test(
             );
             assert.ifError(result.error);
             assert.equal(result.status, 0, result.stderr);
-            assert.equal(result.stdout, '10.2.0');
+            assert.equal(result.stdout, '10.3.0');
         });
         const child = spawn(process.execPath, [path.join(installed, 'dist', 'index.js')], {
             cwd: fixture,
@@ -310,13 +310,13 @@ test(
                 );
                 assert.equal(nativeCatalog.outcome, 'exited');
                 assert.equal(nativeCatalog.process.exitCode, 0);
-                assert.equal(nativeCatalog.runtimeVersion, '10.2.0');
+                assert.equal(nativeCatalog.runtimeVersion, '10.3.0');
                 assert.equal(nativeCatalog.remoteCompletenessVerified, false);
                 const all = await tool('mcdev_list_metadata_types');
-                assert.match(all, /^mcdev 10\.2\.0 — \d+ type\(s\)/);
+                assert.match(all, /^mcdev 10\.3\.0 — \d+ type\(s\)/);
                 assert.match(all, /\*\*journey\*\*/);
                 const matching = await tool('mcdev_list_metadata_types', { filter: 'JoUrNeY' });
-                assert.match(matching, /mcdev 10\.2\.0 — 2 type\(s\)/);
+                assert.match(matching, /mcdev 10\.3\.0 — 2 type\(s\)/);
                 assert.match(matching, /\*\*event\*\*/);
                 assert.match(matching, /\*\*journey\*\*/);
                 assert.match(
@@ -421,7 +421,7 @@ test(
                     fs.writeFileSync(
                         path.join(fixture, 'logs', file),
                         [
-                            '14:00:00.000 debug: :: mcdev 10.2.0 :: ⚡ mcdev retrieve sample/Training query Example_1',
+                            '14:00:00.000 debug: :: mcdev 10.3.0 :: ⚡ mcdev retrieve sample/Training query Example_1',
                             '14:00:00.001 info: mcdev:: Retrieve',
                             '14:00:00.002 info: :: Retrieving sample/Training',
                             '14:00:00.003 info: Retrieving: query - Key: Example_1',
